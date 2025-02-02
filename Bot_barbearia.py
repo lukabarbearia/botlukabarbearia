@@ -1,19 +1,15 @@
 import threading
-from flask import Flask, render_template, request, redirect, send_from_directory, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash
 import mysql.connector
 from datetime import datetime, date 
-from werkzeug.serving import make_ssl_devcert
 import time as time_module 
 
 
 # Módulos padrão do Python
-import os
-import os.path
 import logging
 import datetime  # Importa o módulo completo para evitar conflitos
-from datetime import time, datetime, timedelta
+from datetime import datetime
 import requests
-import pandas as pd
 
 
 # Bibliotecas do Telegram
