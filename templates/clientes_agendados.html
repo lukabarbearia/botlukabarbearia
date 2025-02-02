@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clientes Agendados</title>
+    <style>
+        /* Resetando alguns estilos padrões */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #f0f4f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            background: linear-gradient(135deg, #2e3d52, #4f6d7a);
+            border-radius: 15px;
+            padding: 20px;
+            width: 100%;
+            max-width: 800px;
+            color: #fff;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+            overflow-x: auto; /* Permite scroll horizontal em telas menores */
+        }
+
+        h1 {
+            font-size: 1.5rem; /* Reduzido para melhor visualização em telas pequenas */
+            text-align: center;
+            margin-bottom: 20px;
+            color: #fffae6;
+        }
+
+        h1 span {
+            color: #ffb300; /* Cor ajustada para o barbeiro e a data */
+        }
+
+        table {
+            width: 100%;
+            max-width: 600px; /* Reduz a largura da tabela para telas menores */
+            border-collapse: collapse;
+            text-align: center;
+            margin: 0 auto; /* Centraliza a tabela */
+        }
+
+        thead th {
+            background-color: #4f6d7a;
+            color: #fffae6;
+            font-size: 1.2rem;
+            padding: 10px;
+        }
+
+        tbody tr {
+            background-color: #2e3d52;
+            transition: background-color 0.3s ease;
+        }
+
+        tbody tr:hover {
+            background-color: #2e3d52;
+        }
+
+        td, th {
+            padding: 10px; /* Ajustado para melhor adaptação */
+            border: 1px solid #fff;
+            font-size: 0.9rem;
+        }
+
+        td {
+            font-size: 1rem;
+            font-weight: bold; /* Deixa o texto em negrito */
+            color: #fffae6;
+        }
+
+        .price {
+            font-size: 1.1rem;
+            font-weight: bold; /* Deixa o preço em negrito */
+            color: #ffb300;
+        }
+
+        button {
+            background: none;
+            border: none;
+            color: inherit;
+            font-size: inherit;
+            font-weight: bold;
+            cursor: pointer;
+            text-align: left;
+            padding: 0;
+        }
+
+        button:hover {
+            color: #ffb300;
+        }
+
+        @media (max-width: 600px) {
+            td, th {
+                padding: 8px; /* Reduz espaço em telas menores */
+                font-size: 0.8rem; /* Ajusta o tamanho da fonte */
+            }
+
+            .container {
+                padding: 15px; /* Reduz o padding geral */
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Clientes com Horários Agendados para o barbeiro <span>{{ nome_barbeiro }}</span> em <span>{{ formatted_date }}</span></h1>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Horário</th>
+                    <th>Cliente</th>
+                    <th>Corte</th>
+                    <th>Valor</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for id, celular_barbeiro, horario, nome_cliente, corte, valor in clientes %}
+                <tr>
+                    <td>{{ horario }}</td>
+                    <td>
+                        <form action="{{ url_for('confirmar_corte', horario_id=id) }}" method="post">
+                            <button type="submit">{{ nome_cliente }}</button>
+                        </form>
+                    </td>
+                    <td>{{ corte }}</td>
+                    <td class="price">R$ {{ valor }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</body>
+</html>

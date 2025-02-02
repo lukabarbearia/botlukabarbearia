@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barbeiro já cadastrado</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #f0f4f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            background: linear-gradient(135deg, #2e3d52, #4f6d7a);
+            border-radius: 15px;
+            padding: 40px;
+            width: 85%;
+            max-width: 400px;
+            text-align: center;
+            color: #fff;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: #fffae6;
+            margin-bottom: 20px;
+        }
+
+        p {
+            font-size: 1.1rem;
+            color: #dfe7ec;
+            margin: 10px 0;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-size: 1.1rem;
+            font-weight: bold;
+            width: fit-content; /* Ajusta a largura ao conteúdo */
+            margin: 0 auto; /* Centraliza o contêiner */
+            cursor: pointer; /* Adiciona o estilo de botão */
+            text-align: center;
+            border: none; /* Remove bordas para manter estilo limpo */
+        }
+
+        .ativo {
+            background-color: #4caf50;
+            color: #fff;
+        }
+
+        .inativo {
+            background-color: #ff4d4d;
+            color: #fff;
+        }
+
+        a {
+            background-color: #ffb300;
+            color: #fff;
+            padding: 12px 30px;
+            border-radius: 8px;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 1.1rem;
+            margin-top: 20px;
+            transition: background-color 0.3s;
+        }
+
+        a:hover {
+            background-color: #e69a00;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 1.7rem;
+            }
+
+            .container {
+                width: 95%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Barbeiro já cadastrado</h1>
+        <p><strong>Celular:</strong> {{ celular }}</p>
+        <p><strong>Nome:</strong> {{ nome }}</p>
+        <p><strong>ID Telegram:</strong> {{ id_telegram }}</p>
+    
+        <!-- Botões de Status e Porcentagem -->
+        <div style="display: flex; justify-content: center; gap: 10px; margin-bottom: 20px;">
+            <!-- Botão de Status -->
+            <form action="{{ url_for('alterar_status', celular=celular) }}" method="POST" style="display: inline;">
+                {% if status == "ativo" %}
+                    <button type="submit" class="status ativo">Ativo</button>
+                {% else %}
+                    <button type="submit" class="status inativo">Inativo</button>
+                {% endif %}
+            </form>
+    
+            <!-- Botão de Porcentagem com Dropdown -->
+            <form action="{{ url_for('alterar_comissao', celular=celular) }}" method="POST" style="display: inline;">
+                <div style="position: relative; display: inline-block;">
+                    <button type="button" class="status {{ 'ativo' if porcentagem > 0 else 'inativo' }}" id="dropdown-button">
+                        {{ porcentagem }}%
+                    </button>
+    
+                    <!-- Dropdown com as opções -->
+                    <div id="dropdown-menu" style="
+                        display: none;
+                        position: absolute;
+                        top: 100%;
+                        left: 0;
+                        background-color: #fff;
+                        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                        border-radius: 8px;
+                        z-index: 10;
+                        min-width: 120px;
+                        overflow: hidden;
+                    ">
+                        {% for percent in [40, 50, 60, 100] %}
+                            <button type="submit" name="nova_porcentagem" value="{{ percent }}" style="
+                                width: 100%;
+                                padding: 10px;
+                                text-align: left;
+                                border: none;
+                                background: none;
+                                cursor: pointer;
+                                font-size: 1rem;
+                                transition: background-color 0.2s;
+                            " onmouseover="this.style.backgroundColor='#f0f4f8';" onmouseout="this.style.backgroundColor='transparent';">
+                                {{ percent }}%
+                            </button>
+                        {% endfor %}
+                    </div>
+                </div>
+            </form>
+        </div>
+    
+        <!-- Botão Voltar -->
+        <div style="text-align: center;">
+            <a href="/consultar_barbeiro" style="
+                background-color: #ffb300;
+                color: #fff;
+                padding: 12px 30px;
+                border-radius: 8px;
+                text-decoration: none;
+                display: inline-block;
+                font-size: 1.1rem;
+                transition: background-color 0.3s;
+            " onmouseover="this.style.backgroundColor='#e69a00';" onmouseout="this.style.backgroundColor='#ffb300';">
+                Voltar
+            </a>
+        </div>
+    </div>
+    
+    <script>
+        // Lógica para exibir/esconder o dropdown
+        document.getElementById('dropdown-button').addEventListener('click', function() {
+            const dropdownMenu = document.getElementById('dropdown-menu');
+            dropdownMenu.style.display = dropdownMenu.style.display === 'block' ? 'none' : 'block';
+        });
+    
+        // Fechar o dropdown ao clicar fora
+        document.addEventListener('click', function(event) {
+            const dropdownButton = document.getElementById('dropdown-button');
+            const dropdownMenu = document.getElementById('dropdown-menu');
+            if (!dropdownButton.contains(event.target) && !dropdownMenu.contains(event.target)) {
+                dropdownMenu.style.display = 'none';
+            }
+        });
+    </script>
+    

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lista de cortes</title>
+    <style>
+        /* Resetando alguns estilos padrões */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #f0f4f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            background: linear-gradient(135deg, #2e3d52, #4f6d7a);
+            border-radius: 15px;
+            padding: 20px;
+            width: 100%;
+            max-width: 800px;
+            color: #fff;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+            overflow-x: auto; /* Permite scroll horizontal em telas menores */
+        }
+
+        h2 {
+            font-size: 2rem;
+            text-align: center;
+            margin-bottom: 20px;
+            color: #fffae6;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: center;
+        }
+
+        thead th {
+            background-color: #4f6d7a;
+            color: #fffae6;
+            font-size: 1.2rem;
+            padding: 10px;
+        }
+
+        tbody tr {
+            background-color: #2e3d52;
+            transition: background-color 0.3s ease;
+        }
+
+        tbody tr:hover {
+            background-color: #2e3d52;
+        }
+
+        td, th {
+            padding: 15px;
+            border: 1px solid #fff;
+            font-size: 1rem;
+        }
+
+        td {
+            font-size: 1.2rem;
+            font-weight: bold; /* Deixa o texto em negrito */
+            color: #fffae6;
+        }
+
+        .price {
+            font-size: 1.2rem;
+            font-weight: bold; /* Deixa o preço em negrito */
+            color: #ffb300;
+        }
+
+        a {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        a:hover {
+            color: #ffb300;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Selecione um Corte</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Cortes</th>
+                    <th>Preços</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for corte in cortes %}
+                <tr>
+                    <td>
+                        <a href="{{ url_for('barbeiros', celular_barbeiro=celular, celular_cliente=celular_cliente, corte_id=corte[0]) }}">
+                            {{ corte[1] }}
+                        </a>
+                    </td>
+                    <td class="price">R$ {{ corte[2] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

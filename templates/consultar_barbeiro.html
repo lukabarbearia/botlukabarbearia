@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consultar Barbeiro</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #f0f4f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            background: linear-gradient(135deg, #2e3d52, #4f6d7a);
+            border-radius: 15px;
+            padding: 40px; /* Ajustamos o padding para ficar consistente com outras telas */
+            width: 85%;
+            max-width: 400px;
+            text-align: center;
+            color: #fff;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: #fffae6;
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin: 10px 0;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #dfe7ec;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 2px solid #4f6d7a;
+            border-radius: 8px;
+            background: #fff;
+            font-size: 1rem;
+            color: #333;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus {
+            border-color: #ffb300;
+            outline: none;
+        }
+
+        button {
+            background-color: #ffb300;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 1.1rem;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #e69a00;
+        }
+
+        .messages {
+            margin-top: 20px;
+            list-style-type: none;
+        }
+
+        .messages li {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .messages .error {
+            background-color: #ff4d4d;
+            color: #fff;
+        }
+
+        .messages .success {
+            background-color: #4caf50;
+            color: #fff;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 1.7rem;
+            }
+
+            .container {
+                width: 95%;
+            }
+        }
+    </style>
+    <script>
+    function formatarCelular(celular) {
+        celular = celular.replace(/\D/g, ''); 
+        celular = celular.replace(/^(\d{2})(\d)/, '($1) $2'); 
+        celular = celular.replace(/(\d{5})(\d{1,4})$/, '$1-$2'); 
+        return celular;
+    }
+
+    function limparCelular(celular) {
+        return celular.replace(/\D/g, ''); 
+    }
+
+    function aplicarFormatacao() {
+        var celularInput = document.getElementById("celular");
+        celularInput.value = formatarCelular(celularInput.value);
+    }
+
+    function antesDeEnviarFormulario(event) {
+        var celularInput = document.getElementById("celular");
+        celularInput.value = limparCelular(celularInput.value);
+    }
+</script>
+</head>
+<body>
+    <div class="container">
+        <h1>Consultar Barbeiro</h1>
+
+        <!-- Mensagens flash -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <ul class="messages">
+                    {% for category, message in messages %}
+                        <li class="{{ category }}">{{ message }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" onsubmit="antesDeEnviarFormulario(event)">
+            <label for="celular">Celular do Barbeiro:</label>
+            <input type="text" id="celular" name="celular" required oninput="aplicarFormatacao()" maxlength="15">
+            <button type="submit">Consultar</button>
+        </form>
+    </div>
+</body>
+</html>
+

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Calendário de Datas Disponíveis</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <style>
+        body {
+            background-color: #f0f4f8;
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .calendar-container {
+            background: linear-gradient(135deg, #2e3d52, #4f6d7a);
+            border-radius: 15px;
+            padding: 40px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+            width: 100%; /* Aumentado de 95% para 100% */
+            max-width: 1000px; /* Aumentado de 800px para 1000px */
+            color: #fff;
+            text-align: center;
+            animation: fadeIn 0.8s ease-out;
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 10px; /* Mantido como 10px */
+        }
+        .day-name {
+            font-weight: bold;
+            padding: 10px;
+            color: #dfe7ec;
+        }
+        .calendar-day {
+            border: 1px solid #ccc;
+            padding: 25px; /* Aumentado de 20px para 25px */
+            text-align: center;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s, transform 0.3s;
+        }
+        .calendar-day:hover {
+            background-color: #4caf50;
+            color: white;
+            transform: scale(1.1);
+        }
+        .available-date {
+            background-color: #4caf50;
+            color: white;
+        }
+        .btn-nav {
+            background-color: #ffb300;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .btn-nav:hover {
+            background-color: #e69a00;
+        }
+
+        /* Responsividade */
+        @media (max-width: 768px) {
+            .calendar-container {
+                width: 100%; /* Mantido como 100% */
+                padding: 30px;
+            }
+            .calendar-day {
+                padding: 20px; /* Aumentado de 15px para 20px */
+            }
+        }
+
+        @media (max-width: 480px) {
+            .calendar-container {
+                width: 100%;
+                padding: 20px;
+            }
+            .calendar-day {
+                padding: 15px; /* Aumentado de 12px para 15px */
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="calendar-container">
+        <div class="calendar-header">
+            <button class="btn-nav" onclick="prevMonth()">&#9665;</button>
+            <h2 id="month-title"></h2>
+            <button class="btn-nav" onclick="nextMonth()">&#9655;</button>
+        </div>
+        <div class="calendar-grid" id="calendar-grid"></div>
+    </div>
+
+    <script>
+        const availableDatesData = JSON.parse('{{ datas | tojson | safe }}');
+        const celular_barbeiro = "{{ celular_barbeiro }}";
+        const celular_cliente = "{{ request.args.get('celular_cliente') }}";
+        const nome_cliente = "{{ request.args.get('nome_cliente') }}";
+        const corte_id = "{{ request.args.get('corte_id') }}";
+
+        let currentYear = new Date().getFullYear();
+        let currentMonth = new Date().getMonth();
+
+        function renderCalendar(year, month) {
+            const calendarGrid = document.getElementById('calendar-grid');
+            calendarGrid.innerHTML = '';
+            document.getElementById('month-title').textContent = new Date(year, month).toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+            
+            const daysOfWeek = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+            daysOfWeek.forEach(day => {
+                let dayName = document.createElement('div');
+                dayName.className = 'day-name';
+                dayName.textContent = day;
+                calendarGrid.appendChild(dayName);
+            });
+
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            
+            for (let i = 0; i < firstDay; i++) {
+                let emptyDiv = document.createElement('div');
+                calendarGrid.appendChild(emptyDiv);
+            }
+
+            const availableDates = availableDatesData.map(data => data.original);
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                let calendarDay = document.createElement('button');
+                calendarDay.className = 'calendar-day';
+                calendarDay.textContent = day;
+
+                const formattedDate = new Date(year, month, day).toISOString().split('T')[0];
+
+                if (availableDates.includes(formattedDate)) {
+                    calendarDay.classList.add('available-date');
+                    calendarDay.addEventListener('click', function() {
+                        const url = `/horarios/${celular_barbeiro}/${formattedDate}?celular_cliente=${celular_cliente}&nome_cliente=${nome_cliente}&corte_id=${corte_id}`;
+                        window.location.href = url;
+                    });
+                } else {
+                    calendarDay.disabled = true;
+                }
+
+                calendarGrid.appendChild(calendarDay);
+            }
+        }
+
+        function prevMonth() {
+            if (currentMonth === 0) {
+                currentYear--;
+                currentMonth = 11;
+            } else {
+                currentMonth--;
+            }
+            renderCalendar(currentYear, currentMonth);
+        }
+
+        function nextMonth() {
+            if (currentMonth === 11) {
+                currentYear++;
+                currentMonth = 0;
+            } else {
+                currentMonth++;
+            }
+            renderCalendar(currentYear, currentMonth);
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            renderCalendar(currentYear, currentMonth);
+        });
+    </script>
+</body>
+</html>

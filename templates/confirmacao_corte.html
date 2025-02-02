@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirmação do Corte</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #f0f4f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            padding: 20px; 
+        }
+
+        .container {
+            background: linear-gradient(135deg, #2e3d52, #4f6d7a);
+            border-radius: 15px;
+            padding: 40px; 
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+            width: 85%; 
+            max-width: 600px;
+            color: #fff;
+            text-align: center;
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            margin-bottom: 20px;
+            color: #fff;
+        }
+
+        table {
+            width: 100%;
+            margin-top: 20px;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th, td {
+            padding: 15px;
+            border: 1px solid #fff;
+        }
+
+        th {
+            background-color: #2e3d52;
+            color: #fffae6;
+            font-size: 1.2rem;
+        }
+
+        td {
+            background-color: #2e3d52;
+            color: #ffb300;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        tr:nth-child(even) td {
+            background-color: #2e3d52;
+        }
+
+        tr:hover {
+            background-color: #3c4f62;
+        }
+
+        .highlight {
+            font-weight: bold;
+            font-size: 1.4rem;
+            color: #ffb300;
+        }
+
+        .footer {
+            margin-top: 20px;
+        }
+
+        .footer a {
+            text-decoration: none;
+            background: #ffb300;
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            transition: background-color 0.3s ease;
+        }
+
+        .footer a:hover {
+            background: #e69a00;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+
+            table {
+                font-size: 0.9rem;
+            }
+
+            .container {
+                width: 95%; 
+            }
+        }
+
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 1.7rem;
+            }
+
+            table {
+                font-size: 0.85rem;
+            }
+
+            .container {
+                width: 100%; 
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Corte Confirmado com Sucesso!</h1>
+        <table>
+            <tr>
+                <th>Data</th>
+                <td>{{ confirmacao[0] }}</td>
+            </tr>
+            <tr>
+                <th>Horário</th>
+                <td>{{ confirmacao[1] }}</td>
+            </tr>
+            <tr>
+                <th>Barbeiro</th>
+                <td>{{ confirmacao[2] }}</td>
+            </tr>
+            <tr>
+                <th>Cliente</th>
+                <td>{{ confirmacao[3] }}</td>
+            </tr>
+            <tr>
+                <th>Corte</th>
+                <td>{{ confirmacao[4] }}</td>
+            </tr>
+            <tr>
+                <th>Valor do Corte</th>
+                <td class="highlight">R$ {{ "{:.2f}".format(confirmacao[5]) }}</td>
+            </tr>
+            <tr>
+                <th>Comissão do Barbeiro</th>
+                <td class="highlight">R$ {{ "{:.2f}".format(confirmacao[6]) }}</td>
+            </tr>
+        </table>
+        <div class="footer">
+            <a href="/selecionar_barbeiro">Voltar para Lista de Barbeiros</a>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Horários do Barbeiro</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #f0f4f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            background: linear-gradient(135deg, #2e3d52, #4f6d7a);
+            border-radius: 15px;
+            padding: 40px;
+            width: 85%; /* Ajustamos a largura para 85% da tela, garantindo que ele se ajuste melhor */
+            max-width: 700px;
+            text-align: center;
+            color: #fff;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+            overflow-wrap: break-word; /* Garante que o conteúdo sempre se ajuste ao tamanho do contêiner */
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: #fffae6;
+            margin-bottom: 20px;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 15px;
+        }
+
+        li {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        button {
+            padding: 15px 20px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.2s;
+            width: 100%;
+            text-align: center;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+        }
+
+        button:focus {
+            outline: 2px solid #ffb300;
+            outline-offset: 3px;
+        }
+
+        button:not(.indisponivel) {
+            background-color: #4caf50; /* Cor verde */
+            color: #fff;
+        }
+
+        button:not(.indisponivel):hover {
+            background-color: #45a049; /* Um verde mais escuro ao passar o mouse */
+        }
+
+        button.indisponivel {
+            background-color: #ff4d4d;
+            color: #fff;
+            cursor: not-allowed;
+            width: 100%;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+            ul {
+                grid-template-columns: repeat(3, 1fr);
+            }
+
+            button {
+                font-size: 0.9rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 1.7rem;
+            }
+            ul {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            button {
+                font-size: 0.8rem;
+                padding: 10px 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Selecione um Horário para o dia {{ data }}</h1>
+        <ul>
+            {% for horario, status in horarios %}
+                <li>
+                    {% if status == 'reservado' %}
+                        <button class="indisponivel" disabled>
+                            {{ horario }}
+                        </button>
+                    {% else %}
+                        <form method="POST" action="{{ url_for('reservar') }}">
+                            <input type="hidden" name="celular_barbeiro" value="{{ celular_barbeiro }}">
+                            <input type="hidden" name="data" value="{{ data }}">
+                            <input type="hidden" name="horario" value="{{ horario }}">
+                            <input type="hidden" name="celular_cliente" value="{{ celular_cliente if celular_cliente else '' }}">
+                            <input type="hidden" name="nome_cliente" value="{{ nome_cliente if nome_cliente else '' }}">
+                            <input type="hidden" name="corte_id" value="{{ corte_id }}">
+                            <button type="submit">{{ horario }}</button>
+                        </form>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+</body>
+</html>

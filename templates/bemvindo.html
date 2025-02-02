@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bem-vindo</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #f0f4f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            padding: 20px; 
+        }
+
+        .container {
+            background: linear-gradient(135deg, #2e3d52, #4f6d7a);
+            border-radius: 15px;
+            padding: 40px; 
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+            width: 85%; 
+            max-width: 600px;
+            color: #fff;
+            text-align: center;
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            margin-bottom: 20px;
+            color: #ffb300;
+        }
+
+        p {
+            font-size: 1.1rem;
+            margin: 10px 0;
+            color: #dfe7ec;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 1rem;
+        }
+
+        .alert-success {
+            background-color: #4caf50;
+            color: #fff;
+        }
+
+        .alert-danger {
+            background-color: #ff4d4d;
+            color: #fff;
+        }
+
+        button {
+            background-color: #ffb300;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-top: 10px;
+            width: 100%;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #e69a00;
+        }
+
+        .logout {
+            background-color: #ff4d4d; 
+            margin-top: 15px;
+            transition: background-color 0.3s; 
+        }
+
+        .logout:hover {
+            background-color: #d62929; 
+        }
+
+        form {
+            margin-top: 15px;
+        }
+
+        .highlight {
+            font-weight: bold;
+            color: #fffae6;
+        }
+
+        .cancelar {
+            background-color: #e69a00; 
+        }
+
+        /* Tabela estilizada */
+        table {
+            width: 100%;
+            margin-top: 20px;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th, td {
+            padding: 15px;
+            border: 1px solid #fff;
+        }
+
+        th {
+            background-color: #2e3d52;
+            color: #fffae6;
+            font-size: 1.2rem;
+        }
+
+        td {
+            background-color: #2e3d52;
+            color: #ffb300;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        tr:nth-child(even) td {
+            background-color: #2e3d52;
+        }
+
+        tr:hover {
+            background-color: #2e3d52;
+        }
+
+        .price {
+            font-size: 1.2rem;
+            font-weight: bold; 
+            color: #ffb300;
+        }
+
+        /* Responsividade */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+
+            table {
+                font-size: 0.9rem;
+            }
+
+            .container {
+                width: 95%; 
+            }
+        }
+
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 1.7rem;
+            }
+
+            table {
+                font-size: 0.85rem;
+            }
+
+            .container {
+                width: 100%; 
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Bem-vindo, <span class="highlight">{{ nome_cliente }}</span>!</h1>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% if horario %}
+            <p>Seu horário reservado:</p>
+            <table>
+                <tr>
+                    <th>Barbeiro</th>
+                    <td>{{ nome_barbeiro }}</td>
+                </tr>
+                <tr>
+                    <th>Data</th>
+                    <td>{{ data }}</td>
+                </tr>
+                <tr>
+                    <th>Horário</th>
+                    <td>{{ horario }}</td>
+                </tr>
+                <tr>
+                    <th>Corte</th>
+                    <td>{{ corte }}</td>
+                </tr>
+                <tr>
+                    <th>Valor</th>
+                    <td class="price">R$ {{ valor }}</td>
+                </tr>
+            </table>
+
+            <form action="{{ url_for('cancelar') }}" method="post">
+                <input type="hidden" name="celular_cliente" value="{{ celular_cliente }}">
+                <input type="hidden" name="horario_id" value="{{ horario_id }}">
+                <button type="submit" class="cancelar">Cancelar</button>
+            </form>
+
+            <form action="{{ url_for('reagendar') }}" method="post">
+                <input type="hidden" name="celular_cliente" value="{{ celular_cliente }}">
+                <input type="hidden" name="horario_id" value="{{ horario_id }}">
+                <button type="submit" style="background-color: #4caf50;">Reagendar</button>
+            </form>
+        {% else %}
+            <p>Nenhum horário reservado encontrado para este celular.</p>
+            <form action="{{ url_for('cortes') }}" method="get">
+                <input type="hidden" name="celular_cliente" value="{{ celular_cliente }}">
+                <!--<input type="hidden" name="horario_id" value="{{ horario_id }}"> -->
+                <button type="submit">Agendar Horário</button>
+            </form>
+        {% endif %}
+
+        <!-- Adicionamos o botão de "Sair" -->
+        <form action="{{ url_for('login') }}" method="get">
+            <button type="submit" class="logout">Sair</button>
+        </form>
+    </div>
+
+</body>
+</html>
