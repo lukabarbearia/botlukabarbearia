@@ -1,1 +1,1 @@
-web: gunicorn Bot_barbearia:app
+web: python Bot_barbearia.py
