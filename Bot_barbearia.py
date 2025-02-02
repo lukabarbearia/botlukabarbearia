@@ -36,9 +36,9 @@ app.secret_key = "{k>9IysL&3DQ?cl8rcP4"
 
 config = {
     'user': 'root',
-    'password': 'mLlXOVHTXFYdfYQinXuSLPhQxPtkamDF',  # Senha do Railway
+    'password': 'kyaaZLUdUyKhmuFzzFzAgysbfnsiLQPv',  # Senha do Railway
     'host': 'viaduct.proxy.rlwy.net',  # Host do Railway
-    'port': 15447,  # Porta fornecida pelo Railway
+    'port': 23715,  # Porta fornecida pelo Railway
     'database': 'railway'  # Nome do banco de dados no Railway
 }
 
