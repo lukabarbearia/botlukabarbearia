@@ -32,13 +32,14 @@ logging.getLogger("telegram").setLevel(logging.CRITICAL)
 app = Flask(__name__)
 app.secret_key = "{k>9IysL&3DQ?cl8rcP4"
 
-# Configuração do banco de dados
+
+
 config = {
     'user': 'root',
-    'password': '91Dc045914003@mysql',
-    'host': 'localhost',
-    'port': 3306,
-    'database': 'barbearia'
+    'password': 'mLlXOVHTXFYdfYQinXuSLPhQxPtkamDF',  # Senha do Railway
+    'host': 'viaduct.proxy.rlwy.net',  # Host do Railway
+    'port': 15447,  # Porta fornecida pelo Railway
+    'database': 'railway'  # Nome do banco de dados no Railway
 }
 
 
