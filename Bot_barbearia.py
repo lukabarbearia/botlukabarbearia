@@ -934,7 +934,7 @@ def log_usuario(update, button_name=None):
     comando = update.message.text if update.message else "Botão clicado"
     if button_name:
         comando = f"Botão {button_name} clicado"
-    logger.info(f"Informação {comando} recebido em {data_hora} ID={user_id}, Usuário={user_name}\n")
+    logger.info(f"Informação {comando} recebido em {data_hora} ID={user_id}, Usuário={user_name}")
 
 
 
@@ -1002,8 +1002,7 @@ async def start(update: Update, context: CallbackContext):
     if user_id in LIMITED_ACCESS_USER_IDS:
         # Menu para usuários com acesso limitado
         keyboard = [
-            [InlineKeyboardButton("Agendar Horário", url="http://pcmarcio.ddns.net")],
-            [InlineKeyboardButton("Confirmar Corte", url="http://pcmarcio.ddns.net/selecionar_barbeiro")],
+            [InlineKeyboardButton("Agendar Horário", url="web-production-9c5e2.up.railway.app")],
             [InlineKeyboardButton("Cortes por Barbeiro", callback_data="cortes_barbeiro")],
             [InlineKeyboardButton("Comissão por Barbeiro", callback_data="comissao_barbeiro")],
         ]
@@ -1011,9 +1010,9 @@ async def start(update: Update, context: CallbackContext):
     else:
         # Menu para usuários com acesso total
         keyboard = [
-            [InlineKeyboardButton("Agendar Horário", url="http://pcmarcio.ddns.net")],
-            [InlineKeyboardButton("Cadastrar Barbeiro", url="http://pcmarcio.ddns.net/consultar_barbeiro")],
-            [InlineKeyboardButton("Confirmar Corte", url="http://pcmarcio.ddns.net/selecionar_barbeiro")],
+            [InlineKeyboardButton("Agendar Horário", url="web-production-9c5e2.up.railway.app")],
+            [InlineKeyboardButton("Cadastrar Barbeiro", url="web-production-9c5e2.up.railway.app/consultar_barbeiro")],
+            [InlineKeyboardButton("Confirmar Corte", url="web-production-9c5e2.up.railway.app/selecionar_barbeiro")],
             [InlineKeyboardButton("Lista Barbeiros", callback_data="lista_barbeiro")],
             [InlineKeyboardButton("Cortes por Barbeiro", callback_data="cortes_barbeiro")],
             [InlineKeyboardButton("Comissão por Barbeiro", callback_data="comissao_barbeiro")],
@@ -1055,8 +1054,7 @@ async def menu(update: Update, context: CallbackContext):
     if user_id in LIMITED_ACCESS_USER_IDS:
         # Menu para usuários com acesso limitado
         keyboard = [
-            [InlineKeyboardButton("Agendar Horário", url="http://pcmarcio.ddns.net")],
-            [InlineKeyboardButton("Cadastrar Barbeiro", url="http://pcmarcio.ddns.net/consultar_barbeiro")],
+            [InlineKeyboardButton("Agendar Horário", url="web-production-9c5e2.up.railway.app")],
             [InlineKeyboardButton("Cortes por Barbeiro", callback_data="cortes_barbeiro")],
             [InlineKeyboardButton("Comissão por Barbeiro", callback_data="comissao_barbeiro")],
         ]
@@ -1064,9 +1062,9 @@ async def menu(update: Update, context: CallbackContext):
     else:
         # Menu para usuários com acesso total
         keyboard = [
-            [InlineKeyboardButton("Agendar Horário", url="http://pcmarcio.ddns.net")],
-            [InlineKeyboardButton("Cadastrar Barbeiro", url="http://pcmarcio.ddns.net/consultar_barbeiro")],
-            [InlineKeyboardButton("Confirmar Corte", url="http://pcmarcio.ddns.net/selecionar_barbeiro")],
+            [InlineKeyboardButton("Agendar Horário", url="web-production-9c5e2.up.railway.app")],
+            [InlineKeyboardButton("Cadastrar Barbeiro", url="web-production-9c5e2.up.railway.app/consultar_barbeiro")],
+            [InlineKeyboardButton("Confirmar Corte", url="web-production-9c5e2.up.railway.app/selecionar_barbeiro")],
             [InlineKeyboardButton("Lista Barbeiros", callback_data="lista_barbeiro")],
             [InlineKeyboardButton("Cortes por Barbeiro", callback_data="cortes_barbeiro")],
             [InlineKeyboardButton("Comissão por Barbeiro", callback_data="comissao_barbeiro")],
