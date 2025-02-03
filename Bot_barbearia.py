@@ -2193,7 +2193,7 @@ def main():
         target=app.run,
         kwargs={
             "host": "0.0.0.0",  # Permite acesso externo
-            "port": 5000,        # Porta padrão
+            "port": 8080,        # Porta padrão
             "debug": False,       # Ativa o modo debug (desativar em produção)
             "use_reloader": False,  # Evita múltiplos processos na thread
         },
