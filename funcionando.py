@@ -3,7 +3,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash
 import mysql.connector
 from datetime import datetime, date 
 import time 
-import pytz
+
 
 # Módulos padrão do Python
 import logging
@@ -61,13 +61,10 @@ def login():
             if result:
                 nome_cliente = result[0]
 
-                # Obtendo a data e o horário atuais em Brasília
-                now = datetime.now(pytz.timezone('America/Sao_Paulo'))
+                # Obtendo a data e o horário atuais
+                now = datetime.now()
                 current_date = now.strftime('%Y-%m-%d')  # Formato: '2025-01-20'
                 current_time = now.strftime('%H:%M:%S')  # Formato: '02:43:25'
-
-                print(current_date)
-                print(current_time)
 
                 # Obtendo as informações do horário reservado
                 horario_query = """
@@ -159,8 +156,8 @@ def bemvindo():
         conn = mysql.connector.connect(**config)
         cursor = conn.cursor()
 
-        # Obtendo a data e o horário atuais em Brasília
-        now = datetime.now(pytz.timezone('America/Sao_Paulo'))
+        # Obtendo a data e o horário atuais
+        now = datetime.now()
         current_date = now.strftime('%Y-%m-%d')  # Formato: '2025-01-20'
         current_time = now.strftime('%H:%M:%S')  # Formato: '02:43:25'
 
@@ -352,8 +349,8 @@ def datas(celular_barbeiro):
         conn = mysql.connector.connect(**config)
         cursor = conn.cursor()
 
-        # Obtendo a data atual em Brasília
-        current_date = datetime.now(pytz.timezone('America/Sao_Paulo')).strftime('%Y-%m-%d')  # Formato: '2025-01-20'
+        # Obtendo a data atual
+        current_date = datetime.now().strftime('%Y-%m-%d')  # Formato: '2025-01-20'
 
         # Query para buscar datas disponíveis
         query = """
@@ -410,14 +407,10 @@ def horarios(celular_barbeiro, data):
         conn = mysql.connector.connect(**config)
         cursor = conn.cursor()
 
-        # Obter o horário atual em Brasília no formato HH:MM:SS
-        now = datetime.now(pytz.timezone('America/Sao_Paulo'))
-        hora_atual = now.time()
-        # Obter a data atual em Brasília
-        data_atual = now.date()
-
-        print(hora_atual)
-        print(data_atual)
+        # Obter o horário atual no formato HH:MM:SS
+        hora_atual = datetime.now().time()
+        # Obter a data atual
+        data_atual = date.today()
 
         # Ajustar a consulta SQL com base na data selecionada
         if data_obj == data_atual:
@@ -471,6 +464,7 @@ def horarios(celular_barbeiro, data):
         nome_cliente=nome_cliente,
         corte_id=corte_id
     )
+
 
 
 
