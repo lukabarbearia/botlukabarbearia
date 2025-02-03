@@ -1,5 +1,5 @@
 import threading
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, send_from_directory, url_for, flash
 import mysql.connector
 from datetime import datetime, date 
 import time 
@@ -42,6 +42,10 @@ config = {
 }
 
 
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory('icone', 'iconeluka.ico', mimetype='image/vnd.microsoft.icon')
+
 
 # Página inicial: Login pelo celular
 @app.route('/', methods=['GET', 'POST'])
@@ -66,8 +70,6 @@ def login():
                 current_date = now.strftime('%Y-%m-%d')  # Formato: '2025-01-20'
                 current_time = now.strftime('%H:%M:%S')  # Formato: '02:43:25'
 
-                print(current_date)
-                print(current_time)
 
                 # Obtendo as informações do horário reservado
                 horario_query = """
@@ -754,9 +756,10 @@ def selecionar_barbeiro():
         conn = mysql.connector.connect(**config)
         cursor = conn.cursor()
 
-        # Obtendo a data atual
-        current_date = datetime.now().strftime('%Y-%m-%d')
-        formatted_date = datetime.now().strftime('%d/%m/%Y')
+        # Obtendo a data atual em Brasília
+        now = datetime.now(pytz.timezone('America/Sao_Paulo'))
+        current_date = now.strftime('%Y-%m-%d')
+        formatted_date = now.strftime('%d/%m/%Y')
 
         # Query para buscar barbeiros com horários agendados no dia atual
         query = """
@@ -785,9 +788,10 @@ def selecionar_cliente(celular_barbeiro):
         conn = mysql.connector.connect(**config)
         cursor = conn.cursor()
 
-        # Obtendo a data atual
-        current_date = datetime.now().strftime('%Y-%m-%d')
-        formatted_date = datetime.now().strftime('%d/%m/%Y')
+        # Obtendo a data atual em Brasília
+        now = datetime.now(pytz.timezone('America/Sao_Paulo'))
+        current_date = now.strftime('%Y-%m-%d')
+        formatted_date = now.strftime('%d/%m/%Y')
 
         # Query para buscar o nome do barbeiro
         query_barbeiro = "SELECT nome FROM barbeiros WHERE celular = %s"
@@ -827,8 +831,8 @@ def confirmar_corte(horario_id):
         conn = mysql.connector.connect(**config)
         cursor = conn.cursor()
         
-        # Obtendo a data atual
-        current_date = datetime.now().strftime('%Y-%m-%d')
+        # Obtendo a data atual em Brasília
+        current_date = datetime.now(pytz.timezone('America/Sao_Paulo')).strftime('%Y-%m-%d')
 
         # Inserir dados na tabela confirmados
         insert_query = """
@@ -1171,7 +1175,7 @@ async def lista_barbeiro(update: Update, context: CallbackContext):
 
 def verificar_horario():
     """Verifica se o horário está dentro do permitido (08h às 20h) e se não é domingo."""
-    agora = datetime.now()
+    agora = datetime.now(pytz.timezone('America/Sao_Paulo'))
     hora_atual = agora.hour
     dia_semana = agora.weekday()  # 0 = segunda-feira, 6 = domingo
 
@@ -1180,9 +1184,6 @@ def verificar_horario():
     if 8 <= hora_atual < 20:  # Entre 08h e 20h
         return True
     return False
-
-
-
 
 
 
@@ -1234,7 +1235,7 @@ Deixa tudo na régua, hein? 📏✂️
             
             time.sleep(5)  # Espera 5 segundos antes de rodar novamente
         else:
-            if datetime.now().hour >= 20:
+            if datetime.now(pytz.timezone('America/Sao_Paulo')).hour >= 20:
                 print("Fora do horário permitido. Aguardando 12 horas para reiniciar...")
                 time.sleep(12 * 60 * 60)  # Aguarda 12 horas (caso seja após as 20h)
             else:
@@ -1288,7 +1289,7 @@ Bora continuar arrasando!💪🔥
             
             time.sleep(5)  # Espera 5 segundos antes de rodar novamente
         else:
-            if datetime.now().hour >= 20:
+            if datetime.now(pytz.timezone('America/Sao_Paulo')).hour >= 20:
                 print("Fora do horário permitido. Aguardando 12 horas para reiniciar...")
                 time.sleep(12 * 60 * 60)  # Aguarda 12 horas
             else:
