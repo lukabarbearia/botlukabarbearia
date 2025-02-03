@@ -118,14 +118,14 @@
     </style>
     <script>
     function formatarCelular(celular) {
-        celular = celular.replace(/\D/g, ''); 
-        celular = celular.replace(/^(\d{2})(\d)/, '($1) $2'); 
-        celular = celular.replace(/(\d{5})(\d{1,4})$/, '$1-$2'); 
+        celular = celular.replace(/\D/g, ''); // Remove tudo que não for dígito
+        celular = celular.replace(/^(\d{2})(\d)/, '($1) $2'); // Adiciona os parênteses ao DDD
+        celular = celular.replace(/(\d{5})(\d{1,4})$/, '$1-$2'); // Adiciona o hífen no número
         return celular;
     }
 
     function limparCelular(celular) {
-        return celular.replace(/\D/g, ''); 
+        return celular.replace(/\D/g, ''); // Remove tudo que não for dígito
     }
 
     function aplicarFormatacao() {
@@ -135,9 +135,15 @@
 
     function antesDeEnviarFormulario(event) {
         var celularInput = document.getElementById("celular");
-        celularInput.value = limparCelular(celularInput.value);
+        var celularLimpo = limparCelular(celularInput.value);
+        if (celularLimpo.length !== 11) {
+            alert("O número de celular deve conter exatamente 11 dígitos (incluindo DDD).");
+            event.preventDefault(); // Impede o envio do formulário
+        } else {
+            celularInput.value = celularLimpo;
+        }
     }
-</script>
+    </script>
 </head>
 <body>
     <div class="container">
@@ -156,7 +162,7 @@
 
         <form method="POST" onsubmit="antesDeEnviarFormulario(event)">
             <label for="celular">Celular do Barbeiro:</label>
-            <input type="text" id="celular" name="celular" required oninput="aplicarFormatacao()" maxlength="15">
+            <input type="text" id="celular" name="celular" required oninput="aplicarFormatacao()" maxlength="15" placeholder="(00) 00000-0000">
             <button type="submit">Consultar</button>
         </form>
     </div>

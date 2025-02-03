@@ -2,7 +2,7 @@ import threading
 from flask import Flask, render_template, request, redirect, url_for, flash
 import mysql.connector
 from datetime import datetime, date 
-import time as time_module 
+import time 
 
 
 # Módulos padrão do Python
@@ -32,15 +32,15 @@ logging.getLogger("telegram").setLevel(logging.CRITICAL)
 app = Flask(__name__)
 app.secret_key = "{k>9IysL&3DQ?cl8rcP4"
 
-
-
+# Configuração do banco de dados
 config = {
     'user': 'root',
-    'password': 'kyaaZLUdUyKhmuFzzFzAgysbfnsiLQPv',  # Senha do Railway
-    'host': 'viaduct.proxy.rlwy.net',  # Host do Railway
-    'port': 23715,  # Porta fornecida pelo Railway
-    'database': 'railway'  # Nome do banco de dados no Railway
+    'password': 'YpiQTLzxzjmnQIfaYasaRSZlKFQLFhQT',
+    'host': 'junction.proxy.rlwy.net',
+    'port': 48927,
+    'database': 'railway'
 }
+
 
 
 # Página inicial: Login pelo celular
@@ -979,6 +979,8 @@ carregar_ids_barbeiros()
 
 # Função para o comando /start
 async def start(update: Update, context: CallbackContext):
+    carregar_ids_barbeiros()  # Atualiza os IDs dos barbeiros antes de processar a solicitação
+
     user_id = str(update.effective_user.id)  # Converte o user_id para string
     user_name = update.effective_user.full_name  # Obtém o nome completo do usuário
 
@@ -992,7 +994,7 @@ async def start(update: Update, context: CallbackContext):
 
         # Envia mensagem informando que o usuário não está autorizado
         await update.message.reply_text(
-            f"Olá, {user_name}!👋\nVocê não está autorizado a acessar o Bot Luka Barbearia. Por favor, entre em contato com Márcio Garcia para liberação."
+            f"Olá, {user_name}!👋\nVocê não está autorizado a acessar o Bot Luka Barbearia.\n\nID Telegram: {user_id}"
         )
         return
 
@@ -1030,8 +1032,13 @@ async def start(update: Update, context: CallbackContext):
 
 # Comando para exibir o menu de comandos com botão
 async def menu(update: Update, context: CallbackContext):
-    user_id = str(update.effective_user.id)  # Converte o user_id para string
-    user_name = update.effective_user.full_name  # Obtém o nome completo do usuário
+    carregar_ids_barbeiros()  # Atualiza os IDs dos barbeiros antes de processar a solicitação
+
+    user_id = str(update.effective_user.id)
+    user_name = update.effective_user.full_name
+
+    # Loga a tentativa de acesso
+    log_usuario(update)  # Chama a função log_usuario, que já pega user_id e user_name corretamente
 
     # Verifica se o usuário está autorizado
     if user_id not in map(str, AUTHORIZED_USER_IDS) and user_id not in LIMITED_ACCESS_USER_IDS:
@@ -1040,7 +1047,7 @@ async def menu(update: Update, context: CallbackContext):
 
         # Envia mensagem informando que o usuário não está autorizado
         await update.message.reply_text(
-            f"Olá, {user_name}!👋\nVocê não está autorizado a acessar o Bot Luka Barbearia. Por favor, entre em contato com Márcio Garcia para liberação."
+            f"Olá, {user_name}!👋\nVocê não está autorizado a acessar o Bot Luka Barbearia.\n\nID Telegram: {user_id}"
         )
         return
 
@@ -1158,6 +1165,23 @@ async def lista_barbeiro(update: Update, context: CallbackContext):
 
 
 
+def verificar_horario():
+    """Verifica se o horário está dentro do permitido (08h às 20h) e se não é domingo."""
+    agora = datetime.now()
+    hora_atual = agora.hour
+    dia_semana = agora.weekday()  # 0 = segunda-feira, 6 = domingo
+
+    if dia_semana == 6:  # Domingo
+        return False
+    if 8 <= hora_atual < 20:  # Entre 08h e 20h
+        return True
+    return False
+
+
+
+
+
+
 def enviar_mensagem(telegram_id, mensagem):
     """Envia a mensagem para o usuário no Telegram."""
     payload = {
@@ -1169,22 +1193,21 @@ def enviar_mensagem(telegram_id, mensagem):
     return response.status_code == 200
 
 def enviar_mensagem_barbeiro():
-    """Monitora a tabela mensagem e envia notificações para mensagens pendentes."""
+    """Monitora a tabela mensagem e envia notificações para mensagens pendentes, dentro do horário permitido."""
     while True:
-        try:
-            # Conectar ao banco de dados
-            conn = mysql.connector.connect(**config)
-            cursor = conn.cursor(dictionary=True)
-            
-            # Buscar mensagens com status pendente
-            cursor.execute("SELECT id, data, horario, nome_barbeiro, nome_cliente, corte, id_telegram FROM mensagem WHERE status = 'pendente'")
-            mensagens = cursor.fetchall()
-            
-            for msg in mensagens:
-                data_formatada = datetime.strptime(str(msg['data']), "%Y-%m-%d").strftime("%d/%m/%Y")
-                horario_formatado = datetime.strptime(str(msg['horario']), "%H:%M:%S").strftime("%H:%M")
+        if verificar_horario():
+            try:
+                conn = mysql.connector.connect(**config)
+                cursor = conn.cursor(dictionary=True)
                 
-                mensagem_texto = f"""
+                cursor.execute("SELECT id, data, horario, nome_barbeiro, nome_cliente, corte, id_telegram FROM mensagem WHERE status = 'pendente'")
+                mensagens = cursor.fetchall()
+                
+                for msg in mensagens:
+                    data_formatada = datetime.strptime(str(msg['data']), "%Y-%m-%d").strftime("%d/%m/%Y")
+                    horario_formatado = datetime.strptime(str(msg['horario']), "%H:%M:%S").strftime("%H:%M")
+                    
+                    mensagem_texto = f"""
 *✂️ Novo horário agendado! ✂️*\n
 E aí, {msg['nome_barbeiro']}, tem serviço marcado! 🎉\n
 📅 *Data:* {data_formatada}
@@ -1192,75 +1215,81 @@ E aí, {msg['nome_barbeiro']}, tem serviço marcado! 🎉\n
 👤 *Cliente:* {msg['nome_cliente']}
 ✂️ *Corte:* {msg['corte']}\n
 Deixa tudo na régua, hein? 📏✂️
-                """
+                    """
+                    
+                    if enviar_mensagem(msg['id_telegram'], mensagem_texto):
+                        print(f"Mensagem enviada com sucesso para o ID {msg['id_telegram']} {msg['nome_barbeiro']}")
+                        cursor.execute("UPDATE mensagem SET status = 'enviado' WHERE id = %s", (msg['id'],))
+                        conn.commit()
                 
-                if enviar_mensagem(msg['id_telegram'], mensagem_texto):
-                    print(f"Mensagem enviada com sucesso para o ID {msg['id_telegram']} {msg['nome_barbeiro']}")
-                    # Atualizar status para enviado
-                    cursor.execute("UPDATE mensagem SET status = 'enviado' WHERE id = %s", (msg['id'],))
-                    conn.commit()
+                cursor.close()
+                conn.close()
             
-            cursor.close()
-            conn.close()
-        
-        except Exception as e:
-            print(f"Erro: {e}")
-        
-        # Espera 5 segundos antes de rodar novamente
-        time_module.sleep(5)
-
-
+            except Exception as e:
+                print(f"Erro: {e}")
+            
+            time.sleep(5)  # Espera 5 segundos antes de rodar novamente
+        else:
+            if datetime.now().hour >= 20:
+                print("Fora do horário permitido. Aguardando 12 horas para reiniciar...")
+                time.sleep(12 * 60 * 60)  # Aguarda 12 horas (caso seja após as 20h)
+            else:
+                print("Aguardando para iniciar às 08h...")
+                time.sleep(60 * 60)  # Aguarda 1 hora se ainda não for 08h
 
 def enviar_mensagem_confirmados():
-    """Verifica a tabela confirmados e envia notificações para mensagens pendentes."""
+    """Verifica a tabela confirmados e envia notificações para mensagens pendentes, dentro do horário permitido."""
     while True:
-        try:
-            # Conectar ao banco de dados
-            conn = mysql.connector.connect(**config)
-            cursor = conn.cursor(dictionary=True)
-            
-            # Buscar mensagens com status pendente
-            cursor.execute("""
-                SELECT c.id, c.data, c.horario, b.nome AS nome_barbeiro, cl.nome AS nome_cliente, c.corte, c.valor, c.comissao 
-                FROM confirmados c
-                INNER JOIN barbeiros b ON b.celular = c.celular_barbeiro 
-                INNER JOIN clientes cl ON cl.celular = c.celular_cliente 
-                WHERE c.status = 'pendente'
-            """)
-            confirmados = cursor.fetchall()
-            
-            for conf in confirmados:
-                data_formatada = datetime.strptime(str(conf['data']), "%Y-%m-%d").strftime("%d/%m/%Y")
-                horario_formatado = datetime.strptime(str(conf['horario']), "%H:%M:%S").strftime("%H:%M")
+        if verificar_horario():
+            try:
+                conn = mysql.connector.connect(**config)
+                cursor = conn.cursor(dictionary=True)
                 
-                mensagem_texto = f"""
+                cursor.execute("""
+                    SELECT c.id, c.data, c.horario, b.nome AS nome_barbeiro, cl.nome AS nome_cliente, c.corte, c.valor, c.comissao 
+                    FROM confirmados c
+                    INNER JOIN barbeiros b ON b.celular = c.celular_barbeiro 
+                    INNER JOIN clientes cl ON cl.celular = c.celular_cliente 
+                    WHERE c.status = 'pendente'
+                """)
+                confirmados = cursor.fetchall()
+                
+                for conf in confirmados:
+                    data_formatada = datetime.strptime(str(conf['data']), "%Y-%m-%d").strftime("%d/%m/%Y")
+                    horario_formatado = datetime.strptime(str(conf['horario']), "%H:%M:%S").strftime("%H:%M")
+                    
+                    mensagem_texto = f"""
 *✂️ Corte Realizado! ✂️*\n
 E aí, Lucas, o {conf['nome_barbeiro']} mandou bem demais! 🎉\n
 📅 *Data:* {data_formatada}
 ⏰ *Horário:* {horario_formatado}
-👤*Cliente:* {conf['nome_cliente']}
+👤 *Cliente:* {conf['nome_cliente']}
 ✂️ *Corte:* {conf['corte']}
 💵 *Valor:* {conf['valor']}
 💰 *Comissão:* {conf['comissao']}\n
 O cliente saiu satisfeito e o caixa agradece!💸
-Bora continuar arrasando!+💪🔥
-                """
+Bora continuar arrasando!💪🔥
+                    """
+                    
+                    if enviar_mensagem(637172689, mensagem_texto):
+                        print(f"Mensagem enviada com sucesso para o ID 637172689")
+                        cursor.execute("UPDATE confirmados SET status = 'enviado' WHERE id = %s", (conf['id'],))
+                        conn.commit()
                 
-                if enviar_mensagem(637172689, mensagem_texto):
-                    print(f"Mensagem enviada com sucesso para o ID 637172689")
-                    # Atualizar status para enviado
-                    cursor.execute("UPDATE confirmados SET status = 'enviado' WHERE id = %s", (conf['id'],))
-                    conn.commit()
+                cursor.close()
+                conn.close()
             
-            cursor.close()
-            conn.close()
-        
-        except Exception as e:
-            print(f"Erro: {e}")
-        
-        # Espera 5 segundos antes de rodar novamente
-        time_module.sleep(5)
-
+            except Exception as e:
+                print(f"Erro: {e}")
+            
+            time.sleep(5)  # Espera 5 segundos antes de rodar novamente
+        else:
+            if datetime.now().hour >= 20:
+                print("Fora do horário permitido. Aguardando 12 horas para reiniciar...")
+                time.sleep(12 * 60 * 60)  # Aguarda 12 horas
+            else:
+                print("Aguardando para iniciar às 08h...")
+                time.sleep(60 * 60)  # Aguarda 1 hora se ainda não for 08h
 
 
 
@@ -2165,7 +2194,7 @@ def main():
         kwargs={
             "host": "0.0.0.0",  # Permite acesso externo
             "port": 5000,        # Porta padrão
-            "debug": True,       # Ativa o modo debug (desativar em produção)
+            "debug": False,       # Ativa o modo debug (desativar em produção)
             "use_reloader": False,  # Evita múltiplos processos na thread
         },
     ).start()
@@ -2182,31 +2211,3 @@ def main():
 # Início do programa
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
-# # Função principal para rodar o Flask
-# def main():
-#      # Rodar o Flask em uma thread separada com SSL
-#      threading.Thread(
-#          target=app.run,
-#          kwargs={
-#              "host": "0.0.0.0",
-#              "port": 5000,
-#              "ssl_context": ("certificate.crt", "private.key"),
-#              "debug": True,
-#              "use_reloader": False,  # Evita múltiplos processos na thread
-#          },
-#      ).start()
-
-#      # Rodar o bot no processo principal
-#      run_bot()
-
-#  # Início do programa
-# if __name__ == "__main__":
-#      main()
