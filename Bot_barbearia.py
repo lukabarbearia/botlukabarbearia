@@ -2194,7 +2194,7 @@ def main():
         kwargs={
             "host": "0.0.0.0",  # Permite acesso externo
             "port": 5000,        # Porta padrão
-            "debug": True,       # Ativa o modo debug (desativar em produção)
+            "debug": False,       # Ativa o modo debug (desativar em produção)
             "use_reloader": False,  # Evita múltiplos processos na thread
         },
     ).start()
