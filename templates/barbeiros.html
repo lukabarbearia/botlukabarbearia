@@ -14,7 +14,7 @@
 
         body {
             font-family: 'Arial', sans-serif;
-            background: #f0f4f8;
+            background: linear-gradient(135deg, #dfdfdf, #ffffff);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -41,18 +41,18 @@
             max-width: 600px;
             text-align: center;
             color: #fff;
-            animation: slideUp 1s ease-out;
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 8px 30px rgb(0, 0, 0);
+            animation: fadeIn 0.8s ease-out;
         }
 
-        @keyframes slideUp {
+        @keyframes fadeIn {
             from {
-                transform: translateY(50px);
                 opacity: 0;
+                transform: scale(0.9);
             }
             to {
-                transform: translateY(0);
                 opacity: 1;
+                transform: scale(1);
             }
         }
 

@@ -418,9 +418,6 @@ def horarios(celular_barbeiro, data):
         # Obter a data atual em Brasília
         data_atual = now.date()
 
-        print(hora_atual)
-        print(data_atual)
-
         # Ajustar a consulta SQL com base na data selecionada
         if data_obj == data_atual:
             # Se a data selecionada for o dia atual, filtrar horários >= hora atual
@@ -565,31 +562,6 @@ def reservar():
     except mysql.connector.Error as err:
         flash(f"Erro ao reservar ou reagendar horário: {err}", "danger")
         return redirect(url_for('datas', celular_barbeiro=celular_barbeiro, celular_cliente=celular_cliente))
-
-
-
-# Tela de confirmação de reserva de horário
-@app.route('/reserva_confirmada')
-def reserva_confirmada():
-    nome_barbeiro = request.args.get('nome_barbeiro')
-    horario = request.args.get('horario')
-    data = request.args.get('data')
-    corte = request.args.get('corte')
-    valor = request.args.get('valor')
-
-    # Formatar o horário para exibir sem os segundos
-    horario_formatado = ":".join(horario.split(":")[:2])
-
-    return render_template(
-        'reserva_confirmada.html',
-        nome_barbeiro=nome_barbeiro,
-        horario=horario_formatado,
-        data=data,
-        corte=corte,
-        valor=valor
-    )
-
-
 
 
 
