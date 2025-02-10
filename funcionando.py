@@ -46,6 +46,10 @@ config = {
 def favicon():
     return send_from_directory('icone', 'iconeluka.ico', mimetype='image/vnd.microsoft.icon')
 
+@app.route('/icone/imagemcompartilhamento.jpg')
+def imagem_compartilhamento():
+    return send_from_directory('icone', 'imagemcompartilhamento.jpg', mimetype='image/jpeg')
+
 
 # Página inicial: Login pelo celular
 @app.route('/', methods=['GET', 'POST'])
