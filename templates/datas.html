@@ -7,7 +7,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
     <style>
         body {
-            background: linear-gradient(135deg, #dfdfdf, #ffffff);
+            background: #000000;
             font-family: Arial, sans-serif;
             display: flex;
             justify-content: center;
@@ -17,13 +17,13 @@
             padding: 20px;
         }
         .calendar-container {
-            background: linear-gradient(135deg, #2e3d52, #4f6d7a);
+            background: linear-gradient(135deg, #d68f01, #da9c21);
             border-radius: 15px;
             padding: 40px;
             box-shadow: 0 8px 30px rgb(0, 0, 0);
             width: 100%; /* Aumentado de 95% para 100% */
             max-width: 1000px; /* Aumentado de 800px para 1000px */
-            color: #fff;
+            color: #000000;
             text-align: center;
             animation: fadeIn 0.8s ease-out;
         }
@@ -51,10 +51,10 @@
         .day-name {
             font-weight: bold;
             padding: 10px;
-            color: #dfe7ec;
+            color: #000000;
         }
         .calendar-day {
-            border: 1px solid #ccc;
+            border: 1px solid #000000;
             padding: 25px; /* Aumentado de 20px para 25px */
             text-align: center;
             cursor: pointer;
@@ -62,16 +62,25 @@
             transition: background-color 0.3s, transform 0.3s;
         }
         .calendar-day:hover {
-            background-color: #4caf50;
+            background-color: #388e3c; /* cor quando passa o mouse */
             color: white;
             transform: scale(1.1);
+        }
+        .unavailable-date:hover {
+        background-color: #d62929; /* cor quando passa o mouse nos dias indisponíveis */
+        color: white;
+        transform: scale(1.1);
         }
         .available-date {
             background-color: #4caf50;
             color: white;
         }
+        .unavailable-date {
+        background-color: #b0b0b0;
+        color: white;
+        }
         .btn-nav {
-            background-color: #ffb300;
+            background-color: #000000;
             color: white;
             border: none;
             padding: 10px 20px;
@@ -80,7 +89,7 @@
             transition: background-color 0.3s;
         }
         .btn-nav:hover {
-            background-color: #e69a00;
+            background-color: #4caf50;
         }
 
         /* Responsividade */
@@ -126,9 +135,10 @@
         let currentMonth = new Date().getMonth();
 
         function renderCalendar(year, month) {
-            const calendarGrid = document.getElementById('calendar-grid');
-            calendarGrid.innerHTML = '';
-            document.getElementById('month-title').textContent = new Date(year, month).toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+        const calendarGrid = document.getElementById('calendar-grid');
+        calendarGrid.innerHTML = '';
+        const monthTitle = new Date(year, month).toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+        document.getElementById('month-title').innerHTML = `<strong>${monthTitle.charAt(0).toUpperCase() + monthTitle.slice(1)}</strong>`;
             
             const daysOfWeek = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
             daysOfWeek.forEach(day => {
@@ -162,6 +172,7 @@
                         window.location.href = url;
                     });
                 } else {
+                    calendarDay.classList.add('unavailable-date');
                     calendarDay.disabled = true;
                 }
 

@@ -5,31 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Barbeiro já cadastrado</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
         body {
             font-family: 'Arial', sans-serif;
-            background: linear-gradient(135deg, #dfdfdf, #ffffff);
+            background: #000000;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
-            padding: 20px;
+            margin: 0;
+            padding: 20px; 
         }
 
         .container {
-            background: linear-gradient(135deg, #2e3d52, #4f6d7a);
+            background: linear-gradient(135deg, #d68f01, #da9c21);
             border-radius: 15px;
-            padding: 40px;
-            width: 85%;
-            max-width: 400px;
-            text-align: center;
-            color: #fff;
+            padding: 40px; 
             box-shadow: 0 8px 30px rgb(0, 0, 0);
+            width: 85%; 
+            max-width: 400px;
+            color: #fff;
+            text-align: center;
             animation: fadeIn 0.8s ease-out;
         }
 
@@ -45,28 +40,61 @@
         }
 
         h1 {
-            font-size: 2.5rem;
-            color: #fffae6;
+            font-size: 2.2rem;
             margin-bottom: 20px;
+            color: #ffb300;
         }
 
         p {
             font-size: 1.1rem;
-            color: #dfe7ec;
             margin: 10px 0;
+            color: #dfe7ec;
+        }
+
+        table {
+            width: 100%;
+            margin-top: 20px;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th, td {
+            padding: 15px;
+            border: 1px solid #fff;
+        }
+
+        th {
+            background-color: #2e3d52;
+            color: #fffae6;
+            font-size: 1.2rem;
+        }
+
+        td {
+            background-color: #2e3d52;
+            color: #ffb300;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        tr:nth-child(even) td {
+            background-color: #2e3d52;
+        }
+
+        tr:hover {
+            background-color: #2e3d52;
         }
 
         .status {
-            padding: 10px;
+            padding: 15px;
             border-radius: 8px;
             margin: 10px 0;
-            font-size: 1.1rem;
+            font-size: 1.2rem;
             font-weight: bold;
-            width: fit-content; /* Ajusta a largura ao conteúdo */
-            margin: 0 auto; /* Centraliza o contêiner */
-            cursor: pointer; /* Adiciona o estilo de botão */
+            width: fit-content;
+            margin: 0 auto;
+            cursor: pointer;
             text-align: center;
-            border: none; /* Remove bordas para manter estilo limpo */
+            border: none;
         }
 
         .ativo {
@@ -80,7 +108,7 @@
         }
 
         a {
-            background-color: #ffb300;
+            background-color: #000000;
             color: #fff;
             padding: 12px 30px;
             border-radius: 8px;
@@ -91,13 +119,21 @@
             transition: background-color 0.3s;
         }
 
-        a:hover {
-            background-color: #e69a00;
+        a:hover, a:active {
+            background-color: #d62929;
         }
 
         @media (max-width: 768px) {
             h1 {
                 font-size: 2rem;
+            }
+
+            table {
+                font-size: 0.9rem;
+            }
+
+            .container {
+                width: 95%; 
             }
         }
 
@@ -106,21 +142,36 @@
                 font-size: 1.7rem;
             }
 
+            table {
+                font-size: 0.85rem;
+            }
+
             .container {
-                width: 95%;
+                width: 100%; 
             }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Barbeiro já cadastrado</h1>
-        <p><strong>Celular:</strong> {{ celular }}</p>
-        <p><strong>Nome:</strong> {{ nome }}</p>
-        <p><strong>ID Telegram:</strong> {{ id_telegram }}</p>
-    
+        <h1 style="color: #ffffff;">Barbeiro já cadastrado<span class="highlight" style="color: #000000;">!</h1>
+        <table>
+            <tr>
+                <th>Celular</th>
+                <td>{{ celular }}</td>
+            </tr>
+            <tr>
+                <th>Nome</th>
+                <td>{{ nome }}</td>
+            </tr>
+            <tr>
+                <th>ID Telegram</th>
+                <td>{{ id_telegram }}</td>
+            </tr>
+        </table>
+
         <!-- Botões de Status e Porcentagem -->
-        <div style="display: flex; justify-content: center; gap: 10px; margin-bottom: 20px;">
+        <div style="display: flex; justify-content: center; gap: 10px; margin: 60px 0;">
             <!-- Botão de Status -->
             <form action="{{ url_for('alterar_status', celular=celular) }}" method="POST" style="display: inline;">
                 {% if status == "ativo" %}
@@ -172,7 +223,7 @@
         <!-- Botão Voltar -->
         <div style="text-align: center;">
             <a href="/consultar_barbeiro" style="
-                background-color: #ffb300;
+                background-color: #000000;
                 color: #fff;
                 padding: 12px 30px;
                 border-radius: 8px;
@@ -180,7 +231,7 @@
                 display: inline-block;
                 font-size: 1.1rem;
                 transition: background-color 0.3s;
-            " onmouseover="this.style.backgroundColor='#e69a00';" onmouseout="this.style.backgroundColor='#ffb300';">
+            " onmouseover="this.style.backgroundColor='#d62929';" onmouseout="this.style.backgroundColor='#000000';" onmousedown="this.style.backgroundColor='#d62929';">
                 Voltar
             </a>
         </div>
@@ -202,4 +253,5 @@
             }
         });
     </script>
-    
+</body>
+</html>

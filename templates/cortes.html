@@ -14,7 +14,7 @@
 
         body {
             font-family: 'Arial', sans-serif;
-            background: linear-gradient(135deg, #dfdfdf, #ffffff);
+            background: #000000;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -24,7 +24,7 @@
         }
 
         .container {
-            background: linear-gradient(135deg, #2e3d52, #4f6d7a);
+            background: linear-gradient(135deg, #d68f01, #da9c21);
             border-radius: 15px;
             padding: 20px;
             width: 100%;
@@ -101,11 +101,38 @@
         a:hover {
             color: #ffb300;
         }
+
+        /* Responsividade */
+        @media (max-width: 768px) {
+            td, th {
+                padding: 10px;
+                font-size: 0.9rem;
+            }
+
+            .price {
+                font-size: 1rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            td, th {
+                padding: 8px;
+                font-size: 0.8rem;
+            }
+
+            .price {
+                font-size: 0.9rem;
+            }
+
+            h2 {
+                font-size: 1.5rem;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>Selecione um Corte</h2>
+        <h2 style="color: #fff;">Selecione um Corte</h2>
         <table>
             <thead>
                 <tr>

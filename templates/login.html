@@ -6,8 +6,8 @@
     <title>Login - Barbearia</title>
     <meta property="og:title" content="Luka Barbearia">
     <meta property="og:description" content="Agendamento de horário na Luka Barbearia">
-    <meta property="og:image" content="https://web-production-9c5e2.up.railway.app/icone/imagemcompartilhamento.jpg">
-    <meta property="og:url" content="https://web-production-9c5e2.up.railway.app/">
+    <meta property="og:image" content="http://192.168.1.33:5000/icone/imagemcompartilhamento.jpg">
+    <meta property="og:url" content="http://192.168.1.33:5000/">
     <meta property="og:type" content="website">
     <style>
         * {
@@ -18,7 +18,7 @@
 
         body {
             font-family: 'Arial', sans-serif;
-            background: linear-gradient(135deg, #dfdfdf, #ffffff);
+            background: #000000;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -27,7 +27,7 @@
         }
 
         .container {
-            background: linear-gradient(135deg, #2e3d52, #4f6d7a);
+            background: linear-gradient(135deg, #d68f01, #da9c21);
             border-radius: 15px;
             padding: 40px; /* Ajustamos o padding para ficar consistente com outras telas */
             width: 85%;
@@ -76,12 +76,12 @@
         }
 
         input[type="text"]:focus {
-            border-color: #ffb300;
+            border-color: #000000;
             outline: none;
         }
 
         button {
-            background-color: #ffb300;
+            background-color: #4caf50;
             border: none;
             padding: 12px 30px;
             border-radius: 8px;
@@ -93,7 +93,7 @@
         }
 
         button:hover {
-            background-color: #e69a00;
+            background-color: #388e3c;
         }
 
         .messages {
@@ -164,10 +164,10 @@
 </head>
 <body>
     <div class="container">
-        <h1>Luka Barbearia</h1>
-        <h2 style="color: #e69a00;">Agendamento de horário</h2>
+        <h1 style="color: #000000;"><strong>Luka Barbearia</strong></h1>
+        <h2 style="color: #fff;">Agendamento de horário</h2>
         <form method="POST" action="/" onsubmit="antesDeEnviarFormulario(event)">
-            <label for="celular">Informe seu celular:</label>
+            <label style="color: #000000;">Informe seu celular:</label>
             <input type="text" id="celular" name="celular" required oninput="aplicarFormatacao()" maxlength="15" placeholder="(00) 00000-0000">
             <button type="submit">Entrar</button>
         </form>

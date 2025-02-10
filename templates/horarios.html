@@ -7,7 +7,7 @@
     <style>
         body {
             font-family: 'Arial', sans-serif;
-            background: linear-gradient(135deg, #dfdfdf, #ffffff);
+            background: #000000;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -17,7 +17,7 @@
         }
 
         .container {
-            background: linear-gradient(135deg, #2e3d52, #4f6d7a);
+            background: linear-gradient(135deg, #d68f01, #da9c21);
             border-radius: 15px;
             padding: 40px;
             width: 85%; /* Ajustamos a largura para 85% da tela, garantindo que ele se ajuste melhor */
@@ -62,14 +62,15 @@
         }
 
         button {
-            padding: 15px 20px;
-            border: none;
-            border-radius: 10px;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: background-color 0.3s, transform 0.2s;
-            width: 100%;
-            text-align: center;
+        padding: 15px 20px;
+        border: 1px solid #000000; /* Adicionado contorno preto */
+        border-radius: 10px;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: background-color 0.3s, transform 0.2s;
+        width: 100%;
+        text-align: center;
+        min-width: 130px; /* Adiciona uma largura mínima para os botões */
         }
 
         button:hover {
@@ -127,11 +128,11 @@
 </head>
 <body>
     <div class="container">
-        <h1>Selecione um Horário para o dia {{ data }}</h1>
+        <h1 style="color: #ffffff;">Selecione um Horário para o dia <span class="highlight" style="color: #000000;">{{ data }}</h1>
         <ul>
             {% for horario, status in horarios %}
                 <li>
-                    {% if status == 'reservado' %}
+                    {% if status == 'reservado' or status == 'confirmado' %}
                         <button class="indisponivel" disabled>
                             {{ horario }}
                         </button>
