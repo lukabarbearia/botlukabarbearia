@@ -975,7 +975,7 @@ def log_usuario(update, button_name=None):
 
 
 # Lista de IDs de autorização total
-AUTHORIZED_USER_IDS = [637172689]  # IDs com acesso total
+AUTHORIZED_USER_IDS = [637172689,5097049047]  # IDs com acesso total
 
 # Lista de IDs de autorização limitada (será preenchida dinamicamente)
 LIMITED_ACCESS_USER_IDS = []
@@ -984,6 +984,7 @@ LIMITED_ACCESS_USER_IDS = []
 # ID=637172689 = Márcio Garcia
 # ID=6415636681 = Márcio Corporativo
 # ID=6416269997 = Lucas Lima
+# ID=5097049047 = Rayy
 
 
 
