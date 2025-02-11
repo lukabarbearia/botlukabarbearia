@@ -915,7 +915,21 @@ def adicionar_horarios():
         print(f"Erro ao adicionar horários: {err}")
 
 
+def ajustar_horario_execucao():
+    # Define o fuso horário de Brasília
+    fuso_brasilia = pytz.timezone('America/Sao_Paulo')
 
+    # Obtém o fuso horário do servidor
+    fuso_servidor = datetime.now().astimezone().tzinfo
+
+    # Calcula a hora equivalente no servidor para meia-noite em Brasília
+    agora_em_brasilia = datetime.now(fuso_brasilia)
+    hora_execucao_servidor = agora_em_brasilia.replace(hour=0, minute=0, second=0).astimezone(fuso_servidor).strftime("%H:%M")
+
+    print(f"Agendando execução para {hora_execucao_servidor} no horário do servidor.")
+
+    # Agenda a função no horário correto
+    schedule.every().day.at(hora_execucao_servidor).do(adicionar_horarios)
 
 
 
@@ -2204,8 +2218,7 @@ def run_bot():
 
 # Função para rodar o cron job
 def run_cron_job():
-    # Agenda a função para rodar todos os dias à meia-noite
-    schedule.every().day.at("00:00").do(adicionar_horarios)
+    ajustar_horario_execucao()
 
     while True:
         schedule.run_pending()
