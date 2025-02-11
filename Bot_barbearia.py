@@ -831,7 +831,11 @@ def confirmar_corte(horario_id):
             p.corte, 
             p.valor, 
             b.porcentagem,
-            (b.porcentagem / 100) * p.valor AS comissao
+            CASE 
+                WHEN h.corte_id = 10 THEN 20
+                WHEN h.corte_id = 11 THEN 30
+                ELSE (b.porcentagem / 100) * p.valor 
+            END AS comissao
         FROM horarios h
         INNER JOIN barbeiros b ON b.celular = h.celular_barbeiro
         INNER JOIN precos p ON p.id = h.corte_id
