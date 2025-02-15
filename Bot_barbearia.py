@@ -1,3 +1,4 @@
+import calendar
 import threading
 from flask import Flask, render_template, request, redirect, send_from_directory, url_for, flash
 import mysql.connector
@@ -5,6 +6,7 @@ from datetime import datetime, date, timedelta
 import time 
 import pytz
 import schedule
+import re
 
 # Módulos padrão do Python
 import logging
@@ -148,12 +150,9 @@ def cadastro():
         except mysql.connector.Error as err:
             flash(f"Erro ao cadastrar cliente: {err}", "danger")
 
-        return redirect(url_for('login'))
+        return redirect(url_for('bemvindo', celular_cliente=celular, nome_cliente=nome))
 
     return render_template('cadastro.html', celular=celular)
-
-
-
 
 
 # Página de Bem-vindo
@@ -302,18 +301,12 @@ def cortes():
     # Obtém o dia da semana em Brasília (0 = Segunda, 1 = Terça, ..., 6 = Domingo)
     dia_semana = datetime.now(pytz.timezone('America/Sao_Paulo')).weekday()
 
-    # Define os IDs de acordo com o fluxo
-    if dia_semana in [1, 2]:  # Terça (1) e Quarta (2)
-        ids_permitidos = (1, 2, 5, 6, 7, 8, 9, 10, 11, 12, 13, 16, 17)
-    else:  # Outros dias
-        ids_permitidos = (3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
-
     try:
         conn = mysql.connector.connect(**config)
         cursor = conn.cursor()
 
-        # Ajusta a query para filtrar os IDs permitidos
-        query = "SELECT id, corte, valor FROM precos WHERE id IN ({})".format(",".join(map(str, ids_permitidos)))
+        # Consulta para obter todos os cortes e seus IDs
+        query = "SELECT id, corte, valor FROM precos"
         cursor.execute(query)
         cortes = cursor.fetchall()
 
@@ -323,7 +316,24 @@ def cortes():
         flash(f"Erro ao buscar cortes: {err}", "danger")
         cortes = []
 
-    return render_template('cortes.html', cortes=cortes, celular_cliente=celular_cliente, nome_cliente=nome_cliente)
+    # Organiza os cortes em grupos de acordo com o dia da semana
+    if dia_semana in [1, 2]:  # Terça (1) e Quarta (2)
+        grupos = {
+            "Combos Promoção": [corte for corte in cortes if corte[0] in [7, 8, 9, 10, 11, 12]],
+            "Cortes Promoção": [corte for corte in cortes if corte[0] in [14, 16, 18]],
+            "Barba & Sobrancelha": [corte for corte in cortes if corte[0] in [19, 20, 21]],
+            "Pinturas & Finalizações": [corte for corte in cortes if corte[0] in [22, 23, 24, 25, 26, 27]]
+        }
+    else:  # Outros dias
+        grupos = {
+            "Combos": [corte for corte in cortes if corte[0] in [1, 2, 3, 4, 5, 6]],
+            "Cortes Individuais": [corte for corte in cortes if corte[0] in [13, 15, 17]],
+            "Barba & Sobrancelha": [corte for corte in cortes if corte[0] in [19, 20, 21]],
+            "Pinturas & Finalizações": [corte for corte in cortes if corte[0] in [22, 23, 24, 25, 26, 27]]
+        }
+
+    return render_template('cortes.html', grupos=grupos, celular_cliente=celular_cliente, nome_cliente=nome_cliente)
+
 
 
 
@@ -809,10 +819,23 @@ def selecionar_cliente(celular_barbeiro):
 
 
 
+# Função para selecionar o pagamento e redirecionar para a confirmação do corte
+@app.route('/selecionar_pagamento/<int:horario_id>', methods=['GET', 'POST'])
+def selecionar_pagamento(horario_id):
+    if request.method == 'POST':
+        pagamento = request.form.get('pagamento')
+        return redirect(url_for('confirmar_corte', horario_id=horario_id, pagamento=pagamento))
+    else:
+        return render_template('selecionar_pagamento.html', horario_id=horario_id)
+
+
+
+
+
 
 # Função para confirmar o corte
-@app.route('/confirmar_corte/<int:horario_id>', methods=['POST'])
-def confirmar_corte(horario_id):
+@app.route('/confirmar_corte/<int:horario_id>/<pagamento>', methods=['GET'])
+def confirmar_corte(horario_id, pagamento):
     try:
         conn = mysql.connector.connect(**config)
         cursor = conn.cursor()
@@ -822,7 +845,7 @@ def confirmar_corte(horario_id):
 
         # Inserir dados na tabela confirmados
         insert_query = """
-        INSERT INTO confirmados (data, horario, celular_barbeiro, celular_cliente, corte, valor, porcentagem, comissao)
+        INSERT INTO confirmados (data, horario, celular_barbeiro, celular_cliente, corte, valor, porcentagem, comissao, pagamento)
         SELECT 
             h.data,
             h.horario, 
@@ -832,21 +855,22 @@ def confirmar_corte(horario_id):
             p.valor, 
             b.porcentagem,
             CASE 
-                WHEN h.corte_id = 10 THEN 20
-                WHEN h.corte_id = 11 THEN 30
+                WHEN h.corte_id = 24 THEN 20
+                WHEN h.corte_id = 25 THEN 30
                 ELSE (b.porcentagem / 100) * p.valor 
-            END AS comissao
+            END AS comissao,
+            %s
         FROM horarios h
         INNER JOIN barbeiros b ON b.celular = h.celular_barbeiro
         INNER JOIN precos p ON p.id = h.corte_id
         WHERE h.id = %s AND h.data = %s AND h.status = 'reservado'
         """
-        cursor.execute(insert_query, (horario_id, current_date))
+        cursor.execute(insert_query, (pagamento, horario_id, current_date))
 
         # Recuperar as informações inseridas na tabela confirmados
         select_query = """
         SELECT DATE_FORMAT(cf.data, '%d/%m/%Y') AS data, TIME_FORMAT(cf.horario, '%H:%i') AS horario, 
-               b.nome AS barbeiro, c.nome AS cliente, cf.corte, cf.valor AS valor_do_corte, cf.comissao AS comissao_do_barbeiro
+               b.nome AS barbeiro, c.nome AS cliente, cf.corte, cf.pagamento, cf.valor AS valor_do_corte, cf.comissao AS comissao_do_barbeiro
         FROM confirmados cf
         INNER JOIN barbeiros b ON b.celular = cf.celular_barbeiro
         INNER JOIN clientes c ON c.celular = cf.celular_cliente
@@ -885,6 +909,8 @@ def confirmar_corte(horario_id):
 
 
 
+
+
 # Função para adicionar os horarios
 def adicionar_horarios():
     try:
@@ -901,8 +927,8 @@ def adicionar_horarios():
         for barbeiro in barbeiros:
             celular_barbeiro = barbeiro[0]
 
-            # Gera horários das 08:00 às 19:00 em intervalos de 30 minutos
-            horarios = [(celular_barbeiro, data_atual, (datetime(2000, 1, 1, 8, 0) + timedelta(minutes=30 * i)).time()) for i in range(23)]
+            # Gera horários das 08:00 às 20:00 em intervalos de 30 minutos
+            horarios = [(celular_barbeiro, data_atual, (datetime(2000, 1, 1, 8, 0) + timedelta(minutes=30 * i)).time()) for i in range(25)]
 
             # Insere os horários na tabela
             cursor.executemany("""
@@ -979,7 +1005,7 @@ def log_usuario(update, button_name=None):
 
 
 # Lista de IDs de autorização total
-AUTHORIZED_USER_IDS = [637172689,5097049047]  # IDs com acesso total
+AUTHORIZED_USER_IDS = [637172689,6416269997,5097049047,7190508925]  # IDs com acesso total
 
 # Lista de IDs de autorização limitada (será preenchida dinamicamente)
 LIMITED_ACCESS_USER_IDS = []
@@ -989,6 +1015,7 @@ LIMITED_ACCESS_USER_IDS = []
 # ID=6415636681 = Márcio Corporativo
 # ID=6416269997 = Lucas Lima
 # ID=5097049047 = Rayy
+# ID=7190508925 = Walisson Silva
 
 
 
@@ -1058,6 +1085,7 @@ async def start(update: Update, context: CallbackContext):
             [InlineKeyboardButton("Lista Barbeiros", callback_data="lista_barbeiro")],
             [InlineKeyboardButton("Cortes por Barbeiro", callback_data="cortes_barbeiro")],
             [InlineKeyboardButton("Comissão por Barbeiro", callback_data="comissao_barbeiro")],
+            [InlineKeyboardButton("Ajustar Comissão", callback_data="ajustar_comissao")],
             [InlineKeyboardButton("Faturamento Mês", callback_data="faturamentomes")],
         ]
         welcome_message = f"Olá, {user_name}! 👋\nBem-vindo ao *Bot Luka Barbearia*! 💪\n\nAqui estão as opções disponíveis no menu:"
@@ -1109,6 +1137,7 @@ async def menu(update: Update, context: CallbackContext):
             [InlineKeyboardButton("Lista Barbeiros", callback_data="lista_barbeiro")],
             [InlineKeyboardButton("Cortes por Barbeiro", callback_data="cortes_barbeiro")],
             [InlineKeyboardButton("Comissão por Barbeiro", callback_data="comissao_barbeiro")],
+            [InlineKeyboardButton("Ajustar Comissão", callback_data="ajustar_comissao")],
             [InlineKeyboardButton("Faturamento Mês", callback_data="faturamentomes")],
         ]
         message_text = "Escolha uma opção:"
@@ -1212,7 +1241,7 @@ def verificar_horario():
 
     if dia_semana == 6:  # Domingo
         return False
-    if 8 <= hora_atual < 20:  # Entre 08h e 20h
+    if 8 <= hora_atual < 21:  # Entre 08h e 21h
         return True
     return False
 
@@ -1266,7 +1295,7 @@ Deixa tudo na régua, hein? 📏✂️
             
             time.sleep(5)  # Espera 5 segundos antes de rodar novamente
         else:
-            if datetime.now(pytz.timezone('America/Sao_Paulo')).hour >= 20:
+            if datetime.now(pytz.timezone('America/Sao_Paulo')).hour >= 21:
                 print("Fora do horário permitido. Aguardando 12 horas para reiniciar...")
                 time.sleep(12 * 60 * 60)  # Aguarda 12 horas (caso seja após as 20h)
             else:
@@ -1282,7 +1311,8 @@ def enviar_mensagem_confirmados():
                 cursor = conn.cursor(dictionary=True)
                 
                 cursor.execute("""
-                    SELECT c.id, c.data, c.horario, b.nome AS nome_barbeiro, cl.nome AS nome_cliente, c.corte, c.valor, c.comissao 
+                    SELECT c.id, c.data, c.horario, b.nome AS nome_barbeiro, cl.nome AS nome_cliente, 
+                           c.pagamento, c.corte, c.valor, c.comissao, b.id_telegram   
                     FROM confirmados c
                     INNER JOIN barbeiros b ON b.celular = c.celular_barbeiro 
                     INNER JOIN clientes cl ON cl.celular = c.celular_cliente 
@@ -1295,22 +1325,33 @@ def enviar_mensagem_confirmados():
                     horario_formatado = datetime.strptime(str(conf['horario']), "%H:%M:%S").strftime("%H:%M")
                     
                     mensagem_texto = f"""
-*✂️ Corte Realizado! ✂️*\n
-E aí, Lucas, o {conf['nome_barbeiro']} mandou bem demais! 🎉\n
+*✂️ Corte Realizado! ✂️*
+
+E aí, {conf['nome_barbeiro']} mandou bem demais! 🎉
 📅 *Data:* {data_formatada}
 ⏰ *Horário:* {horario_formatado}
 👤 *Cliente:* {conf['nome_cliente']}
 ✂️ *Corte:* {conf['corte']}
+💳 *Pagamento:* {conf['pagamento']}
 💵 *Valor:* {conf['valor']}
-💰 *Comissão:* {conf['comissao']}\n
+💰 *Comissão:* {conf['comissao']}
+
 O cliente saiu satisfeito e o caixa agradece!💸
 Bora continuar arrasando!💪🔥
                     """
                     
-                    if enviar_mensagem(637172689, mensagem_texto):
-                        print(f"Mensagem enviada com sucesso para o ID 637172689")
-                        cursor.execute("UPDATE confirmados SET status = 'enviado' WHERE id = %s", (conf['id'],))
-                        conn.commit()
+                    # Envia a mensagem para o ID fixo e para o barbeiro
+                    ids_destinatarios = [637172689,6416269997]
+                    if conf['id_telegram']:
+                        ids_destinatarios.append(conf['id_telegram'])
+                    
+                    for id_dest in ids_destinatarios:
+                        if enviar_mensagem(id_dest, mensagem_texto):
+                            print(f"Mensagem enviada com sucesso para o ID {id_dest}")
+                    
+                    # Atualiza o status para 'enviado'
+                    cursor.execute("UPDATE confirmados SET status = 'enviado' WHERE id = %s", (conf['id'],))
+                    conn.commit()
                 
                 cursor.close()
                 conn.close()
@@ -1320,12 +1361,13 @@ Bora continuar arrasando!💪🔥
             
             time.sleep(5)  # Espera 5 segundos antes de rodar novamente
         else:
-            if datetime.now(pytz.timezone('America/Sao_Paulo')).hour >= 20:
+            if datetime.now(pytz.timezone('America/Sao_Paulo')).hour >= 21:
                 print("Fora do horário permitido. Aguardando 12 horas para reiniciar...")
                 time.sleep(12 * 60 * 60)  # Aguarda 12 horas
             else:
                 print("Aguardando para iniciar às 08h...")
                 time.sleep(60 * 60)  # Aguarda 1 hora se ainda não for 08h
+
 
 
 
@@ -1480,11 +1522,12 @@ async def exibir_cortes(update: Update, context: CallbackContext):
 
         # Consulta para obter os cortes confirmados
         cursor.execute("""
-            SELECT c.data, c.horario, b.nome AS nome_barbeiro, cl.nome AS nome_cliente, c.corte,c.valor, c.comissao 
+            SELECT c.data, c.horario, b.nome AS nome_barbeiro, cl.nome AS nome_cliente, c.corte, c.pagamento,c.valor, c.comissao 
             FROM confirmados c
             INNER JOIN barbeiros b ON b.celular = c.celular_barbeiro 
             INNER JOIN clientes cl ON cl.celular = c.celular_cliente 
             WHERE b.id_telegram = %s AND YEAR(c.data) = %s AND MONTH(c.data) = %s
+            ORDER BY C.data, C.horario
         """, (id_telegram, ano, mes))
         cortes = cursor.fetchall()
 
@@ -1504,7 +1547,7 @@ async def exibir_cortes(update: Update, context: CallbackContext):
         for corte in cortes:
             data_formatada = datetime.strptime(str(corte['data']), "%Y-%m-%d").strftime("%d/%m/%Y")
             horario_formatado = datetime.strptime(str(corte['horario']), "%H:%M:%S").strftime("%H:%M")
-            mensagens.append(f"*Data:* {data_formatada}\n*Horário:* {horario_formatado}\n*Cliente:* {corte['nome_cliente']}\n*Corte:* {corte['corte']}\n*valor:* R$ {corte['valor']}\n*Comissão:* R$ {corte['comissao']}\n\n")
+            mensagens.append(f"*Data:* {data_formatada}\n*Horário:* {horario_formatado}\n*Cliente:* {corte['nome_cliente']}\n*Corte:* {corte['corte']}\n*Pagamento:* {corte['pagamento']}\n*valor:* R$ {corte['valor']}\n*Comissão:* R$ {corte['comissao']}\n\n")
 
         # Dividir a mensagem em blocos de 20 cortes
         blocos = [mensagens[i:i + 20] for i in range(0, len(mensagens), 20)]
@@ -1713,7 +1756,7 @@ async def selecionar_mes_comissao(update: Update, context: CallbackContext):
 
 
 
-# Função para exibir a comissão total
+# Função para exibir a comissão total com acréscimos e descontos
 async def exibir_comissao(update: Update, context: CallbackContext):
     query = update.callback_query
     _, mes, ano, id_telegram = query.data.split('_')
@@ -1733,37 +1776,101 @@ async def exibir_comissao(update: Update, context: CallbackContext):
 
         celular_barbeiro = resultado['celular']
 
-        # Consulta para obter as comissões
-        sql = """
-            SELECT comissao 
-            FROM confirmados 
-            WHERE celular_barbeiro = %s AND YEAR(data) = %s AND MONTH(data) = %s
-        """
+        # Obtém o último dia do mês
+        ultimo_dia = calendar.monthrange(int(ano), int(mes))[1]
 
-        cursor.execute(sql, (celular_barbeiro, ano, mes))
-        comissoes = cursor.fetchall()
+        # Consulta para obter as comissões do dia 1 ao 15
+        cursor.execute(
+            """
+            SELECT COALESCE(SUM(comissao), 0) AS total
+            FROM confirmados
+            WHERE celular_barbeiro = %s AND YEAR(data) = %s AND MONTH(data) = %s AND DAY(data) BETWEEN 1 AND 15
+            """,
+            (celular_barbeiro, ano, mes)
+        )
+        total_parte1 = cursor.fetchone()["total"]
 
-        # Verifica se há resultados
-        if not comissoes:
-            await query.message.reply_text("Nenhuma comissão encontrada.")
-            return
+        # Consulta para obter as comissões do dia 16 ao último dia do mês
+        cursor.execute(
+            """
+            SELECT COALESCE(SUM(comissao), 0) AS total
+            FROM confirmados
+            WHERE celular_barbeiro = %s AND YEAR(data) = %s AND MONTH(data) = %s AND DAY(data) BETWEEN 16 AND %s
+            """,
+            (celular_barbeiro, ano, mes, ultimo_dia)
+        )
+        total_parte2 = cursor.fetchone()["total"]
 
-        # Calcula a soma das comissões
-        total_comissao = sum(comissao["comissao"] for comissao in comissoes)
+        # Consulta para obter acréscimos e descontos do dia 1 ao 15
+        cursor.execute(
+            """
+            SELECT data, tipo, descricao, valor
+            FROM taxas
+            WHERE celular_barbeiro = %s AND YEAR(data) = %s AND MONTH(data) = %s AND DAY(data) BETWEEN 1 AND 15
+            """,
+            (celular_barbeiro, ano, mes)
+        )
+        taxas_parte1 = cursor.fetchall()
+
+        # Consulta para obter acréscimos e descontos do dia 16 ao último dia do mês
+        cursor.execute(
+            """
+            SELECT data, tipo, descricao, valor
+            FROM taxas
+            WHERE celular_barbeiro = %s AND YEAR(data) = %s AND MONTH(data) = %s AND DAY(data) BETWEEN 16 AND %s
+            """,
+            (celular_barbeiro, ano, mes, ultimo_dia)
+        )
+        taxas_parte2 = cursor.fetchall()
+
+        # Separar acréscimos e descontos para os dois períodos
+        def formatar_taxas(taxas):
+            acrescimos = []
+            descontos = []
+            total_acrescimos = 0
+            total_descontos = 0
+
+            for taxa in taxas:
+                data_formatada = datetime.strptime(str(taxa["data"]), "%Y-%m-%d").strftime("%d/%m/%Y")
+                if taxa["tipo"] == "acréscimo":
+                    acrescimos.append(f"\nData: {data_formatada}\nDescrição: {taxa['descricao']}\nValor: R$ {taxa['valor']:.2f}")
+                    total_acrescimos += taxa["valor"]
+                elif taxa["tipo"] == "desconto":
+                    descontos.append(f"\nData: {data_formatada}\nDescrição: {taxa['descricao']}\nValor: R$ {taxa['valor']:.2f}")
+                    total_descontos += taxa["valor"]
+
+            return acrescimos, descontos, total_acrescimos, total_descontos
+
+        acrescimos_parte1, descontos_parte1, total_acrescimos1, total_descontos1 = formatar_taxas(taxas_parte1)
+        acrescimos_parte2, descontos_parte2, total_acrescimos2, total_descontos2 = formatar_taxas(taxas_parte2)
+
+        # Cálculo final dos valores a receber
+        valor_receber_parte1 = total_parte1 + total_acrescimos1 - total_descontos1
+        valor_receber_parte2 = total_parte2 + total_acrescimos2 - total_descontos2
+        valor_total_mes = valor_receber_parte1 + valor_receber_parte2
 
         # Meses em português
         meses_pt = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
         nome_mes = meses_pt[int(mes) - 1]
 
-        # Formata a mensagem para o usuário
-        resposta = f"A comissão total do barbeiro no mês de {nome_mes} de {ano} é:\n\nR$ {total_comissao:.2f}"
+        # Formata a mensagem
+        resposta = (
+            f"A comissão do barbeiro no mês de {nome_mes} de {ano} é:\n\n"
+            f"Valor entre o dia 01 a 15\nR$ {total_parte1:.2f}\n\n"
+            f"➕Acréscimos:\n" + ("\n".join(acrescimos_parte1) if acrescimos_parte1 else "Nenhum valor aplicado") + "\n\n"
+            f"➖Descontos:\n" + ("\n".join(descontos_parte1) if descontos_parte1 else "Nenhum valor aplicado") + "\n\n"
+            f"Valor a receber:\n✅R$ {valor_receber_parte1:.2f}\n\n"
+            f"Valor entre o dia 16 a {ultimo_dia}\nR$ {total_parte2:.2f}\n\n"
+            f"➕Acréscimos:\n" + ("\n".join(acrescimos_parte2) if acrescimos_parte2 else "Nenhum valor aplicado") + "\n\n"
+            f"➖Descontos:\n" + ("\n".join(descontos_parte2) if descontos_parte2 else "Nenhum valor aplicado") + "\n\n"
+            f"Valor a receber:\n✅R$ {valor_receber_parte2:.2f}\n\n"
+            f"Valor total recebido do mês R$ {valor_total_mes:.2f}"
+        )
 
         # Define os botões "Menu" e "Consultar Novamente"
         keyboard = [
-            
-                [InlineKeyboardButton("Consultar Novamente", callback_data="comissao_barbeiro")],
-                [InlineKeyboardButton("Menu", callback_data="menu")],
-            
+            [InlineKeyboardButton("Consultar Novamente", callback_data="comissao_barbeiro")],
+            [InlineKeyboardButton("Menu", callback_data="menu")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -1789,293 +1896,408 @@ async def exibir_comissao(update: Update, context: CallbackContext):
 
 
 
-# Função para exibir os botões "Líquido" e "Bruto"
-async def selecionar_tipo_faturamento(update: Update, context: CallbackContext):
+
+
+
+
+
+
+
+# Função para exibir anos disponíveis
+async def selecionar_ano_faturamento(update: Update, context: CallbackContext):
     query = update.callback_query
+    button_name = "Faturamento Mês"  # Nome do botão
+    log_usuario(update, button_name)  # Log para registrar quem clicou no botão
     await query.answer()
 
-    # Cria os botões "Líquido" e "Bruto"
+    try:
+        conn = mysql.connector.connect(**config)
+        cursor = conn.cursor()
+
+        # Obtém os anos distintos da tabela confirmados
+        cursor.execute("SELECT DISTINCT EXTRACT(YEAR FROM data) FROM confirmados ORDER BY 1 DESC")
+        anos = [str(row[0]) for row in cursor.fetchall()]
+
+        if not anos:
+            # Cria botões "Consultar Novamente" e "Menu"
+            keyboard = [
+                [InlineKeyboardButton("Consultar Novamente", callback_data="faturamentomes")],
+                [InlineKeyboardButton("Menu", callback_data="menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            await query.message.reply_text("Nenhum dado encontrado.", reply_markup=reply_markup)
+            return
+
+        # Cria botões para os anos
+        keyboard = [[InlineKeyboardButton(ano, callback_data=f"anofaturamento_{ano}")] for ano in anos]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await query.message.reply_text("Selecione um ano:", reply_markup=reply_markup)
+
+    except mysql.connector.Error as err:
+        await query.message.reply_text(f"Erro ao acessar o banco de dados: {err}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+# Dicionário para mapear o número do mês para o nome do mês
+meses_nome = {
+    "1": "Janeiro", "2": "Fevereiro", "3": "Março", "4": "Abril", "5": "Maio", "6": "Junho",
+    "7": "Julho", "8": "Agosto", "9": "Setembro", "10": "Outubro", "11": "Novembro", "12": "Dezembro"
+}
+
+# Função para exibir meses disponíveis com base no ano selecionado
+async def selecionar_mes_faturamento(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+    ano_selecionado = query.data.split("_")[1]  # Extrai o ano da callback_data
+
+    try:
+        conn = mysql.connector.connect(**config)
+        cursor = conn.cursor()
+
+        # Obtém os meses disponíveis no ano selecionado
+        cursor.execute(f"SELECT DISTINCT EXTRACT(MONTH FROM data) FROM confirmados WHERE EXTRACT(YEAR FROM data) = {ano_selecionado} ORDER BY 1")
+        meses = [str(row[0]) for row in cursor.fetchall()]
+
+        if not meses:
+            await query.message.reply_text("Nenhum mês disponível para este ano.")
+            return
+
+        # Cria botões para os meses com os nomes em vez dos números
+        keyboard = [[InlineKeyboardButton(f"{meses_nome[mes]}", callback_data=f"mesfaturamento_{ano_selecionado}_{mes}")] for mes in meses]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await query.message.reply_text(f"Selecione um mês:", reply_markup=reply_markup)
+
+    except mysql.connector.Error as err:
+        await query.message.reply_text(f"Erro ao acessar o banco de dados: {err}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+# Função para calcular e exibir o faturamento líquido do mês selecionado
+async def exibir_faturamento(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+    _, ano, mes = query.data.split("_")  # Extrai ano e mês da callback_data
+
+    try:
+        conn = mysql.connector.connect(**config)
+        cursor = conn.cursor(dictionary=True)
+
+        # Calcula o faturamento bruto (soma da coluna 'valor' na tabela confirmados)
+        cursor.execute(
+            """
+            SELECT COALESCE(SUM(valor), 0) AS faturamento_bruto
+            FROM confirmados 
+            WHERE YEAR(data) = %s AND MONTH(data) = %s
+            """,
+            (ano, mes)
+        )
+        faturamento_bruto = cursor.fetchone()["faturamento_bruto"]
+
+        # Calcula o total de comissões (coluna 'comissao' da tabela confirmados)
+        cursor.execute(
+            """
+            SELECT COALESCE(SUM(comissao), 0) AS total_comissao
+            FROM confirmados
+            WHERE YEAR(data) = %s AND MONTH(data) = %s
+            """,
+            (ano, mes)
+        )
+        total_comissao = cursor.fetchone()["total_comissao"]
+
+        # Calcula os acréscimos e descontos na tabela 'taxas' para todos os barbeiros no mês
+        cursor.execute(
+            """
+            SELECT 
+                SUM(CASE WHEN tipo = 'acréscimo' THEN valor ELSE 0 END) AS total_acrescimos,
+                SUM(CASE WHEN tipo = 'desconto' THEN valor ELSE 0 END) AS total_descontos
+            FROM taxas
+            WHERE YEAR(data) = %s AND MONTH(data) = %s
+            """,
+            (ano, mes)
+        )
+        taxas_resultado = cursor.fetchone()
+        total_acrescimos = taxas_resultado["total_acrescimos"] or 0
+        total_descontos = taxas_resultado["total_descontos"] or 0
+
+        # Ajusta a comissão com os acréscimos e descontos
+        comissao_ajustada = total_comissao + total_acrescimos - total_descontos
+
+        # Calcula o faturamento líquido
+        faturamento_liquido = faturamento_bruto - comissao_ajustada
+
+        # Formata o nome do mês
+        meses_pt = [
+            "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+            "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+        ]
+        nome_mes = meses_pt[int(mes) - 1]
+
+        # Formata a resposta com os valores
+        resposta = (
+            f"Faturamento de {nome_mes} de {ano}:\n\n"
+            f"Faturamento Bruto: R$ {faturamento_bruto:,.2f}\n"
+            f"Total de Comissões: R$ {total_comissao:,.2f}\n"
+            f"Acréscimos: R$ {total_acrescimos:,.2f}\n"
+            f"Descontos: R$ {total_descontos:,.2f}\n\n"
+            f"Faturamento Líquido: R$ {faturamento_liquido:,.2f}"
+        )
+
+        # Define os botões "Menu" e "Consultar Novamente"
+        keyboard = [
+            [InlineKeyboardButton("Consultar Novamente", callback_data="faturamentomes")],
+            [InlineKeyboardButton("Menu", callback_data="menu")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        # Envia a mensagem para o usuário com os botões
+        await query.message.reply_text(
+            resposta,
+            reply_markup=reply_markup
+        )
+
+    except mysql.connector.Error as err:
+        await query.message.reply_text(f"Erro ao acessar o banco de dados: {err}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+async def ajustar_comissao(update: Update, context: CallbackContext):
+    query = update.callback_query
+    button_name = "Ajustar Comissão"
+    log_usuario(update, button_name)
+
+    try:
+        conn = mysql.connector.connect(**config)
+        cursor = conn.cursor(dictionary=True)
+
+        cursor.execute("SELECT celular, nome FROM barbeiros WHERE status = 'ativo'")
+        barbeiros = cursor.fetchall()
+
+        if not barbeiros:
+            keyboard = [
+                [InlineKeyboardButton("Consultar Novamente", callback_data="comissao_barbeiro")],
+                [InlineKeyboardButton("Menu", callback_data="menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.message.reply_text("Nenhum dado encontrado.", reply_markup=reply_markup)
+            return
+
+        keyboard = [[InlineKeyboardButton(barbeiro["nome"], callback_data=f"barbeiro_{barbeiro['celular']}")] for barbeiro in barbeiros]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.message.reply_text("Selecione um barbeiro:", reply_markup=reply_markup)
+    finally:
+        cursor.close()
+        conn.close()
+
+
+
+
+async def detalhes_barbeiro(update: Update, context: CallbackContext):
+    query = update.callback_query
+    celular_barbeiro = query.data.split("_")[1]
+    
+    # Obtém o mês e ano atuais no horário de Brasília
+    data_atual = datetime.now(pytz.timezone('America/Sao_Paulo'))
+    mes_atual = str(data_atual.month)  # Converte para string para buscar no dicionário
+    ano_atual = str(data_atual.year)
+    nome_mes_atual = meses_nome[mes_atual]  # Obtém o nome do mês
+    
+    conn = mysql.connector.connect(**config)
+    cursor = conn.cursor(dictionary=True)
+    
+    # Filtra apenas os dados do mês e ano atuais
+    cursor.execute("SELECT data, tipo, descricao, valor FROM taxas WHERE celular_barbeiro = %s AND MONTH(data) = %s AND YEAR(data) = %s", 
+                   (celular_barbeiro, mes_atual, ano_atual))
+    taxas = cursor.fetchall()
+    
+    cursor.close()
+    conn.close()
+    
+    if not taxas:
+        mensagem = f"Nenhum dado encontrado para {nome_mes_atual}."
+    else:
+        acrescimos = []
+        descontos = []
+        
+        for t in taxas:
+            data_formatada = datetime.strptime(str(t['data']), '%Y-%m-%d').strftime('%d/%m/%Y')
+            entrada_formatada = f"\nData: {data_formatada}\nDescrição: {t['descricao']}\nValor: R$ {t['valor']}\n"
+            
+            if t['tipo'].lower() == "acréscimo":
+                acrescimos.append(entrada_formatada)
+            else:
+                descontos.append(entrada_formatada)
+        
+        mensagem = f"Dados encontrados para {nome_mes_atual}:\n\n"
+        if acrescimos:
+            mensagem += "➕Acréscimos:\n" + "".join(acrescimos) + "\n"
+        if descontos:
+            mensagem += "➖Descontos:\n" + "".join(descontos)
+    
     keyboard = [
-        [InlineKeyboardButton("Líquido", callback_data="faturamentoliquido")],
-        [InlineKeyboardButton("Bruto", callback_data="faturamentobruto")]
+        [InlineKeyboardButton("Adicionar Acréscimo", callback_data=f"adicionar_acrescimo_{celular_barbeiro}")],
+        [InlineKeyboardButton("Adicionar Desconto", callback_data=f"adicionar_desconto_{celular_barbeiro}")],
+        [InlineKeyboardButton("Menu", callback_data="menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.message.reply_text(mensagem, reply_markup=reply_markup)
+
+
+
+
+
+
+
+async def adicionar_acrescimo(update: Update, context: CallbackContext):
+    query = update.callback_query
+    celular_barbeiro = query.data.split("_")[2]
+    context.user_data["celular_barbeiro"] = celular_barbeiro
+    context.user_data["aguardando_input"] = "DESCRICAO_ACRESCIMO"  # Define o estado correto
+
+    await query.message.reply_text("Qual descrição do acréscimo?")
+    return
+
+async def receber_descricao_acrescimo(update: Update, context: CallbackContext):
+    descricao = update.message.text
+    if re.search(r'\d', descricao):
+        await update.message.reply_text("A descrição não pode conter números. Digite novamente:")
+        return  # Apenas retorna, sem mudar o estado
+    
+    context.user_data["descricao"] = descricao
+    context.user_data["aguardando_input"] = "VALOR_ACRESCIMO"  # Atualiza o estado corretamente
+    
+    await update.message.reply_text("Qual valor do acréscimo?")
+
+async def receber_valor_acrescimo(update: Update, context: CallbackContext):
+    valor = update.message.text.replace(",", ".")  # Substitui vírgula por ponto
+
+    if not re.match(r'^[0-9]+(\.[0-9]{1,2})?$', valor):
+        await update.message.reply_text("O valor deve ser numérico. Digite novamente:")
+        return  # Apenas retorna, sem mudar o estado
+
+    celular_barbeiro = context.user_data["celular_barbeiro"]
+    descricao = context.user_data["descricao"]
+    data_atual = datetime.now().strftime('%Y-%m-%d')
+
+    # Insere os dados no banco
+    conn = mysql.connector.connect(**config)
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO taxas (data, celular_barbeiro, tipo, descricao, valor) VALUES (%s, %s, %s, %s, %s)",
+                   (data_atual, celular_barbeiro, "Acréscimo", descricao, valor))
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    # Limpa o contexto
+    context.user_data.pop("aguardando_input", None)
+    context.user_data.pop("descricao", None)  # Removemos a descrição para evitar dados antigos
+    context.user_data.pop("celular_barbeiro", None)
+
+    # Define os botões "Adicionar Novamente" e "Menu"
+    keyboard = [
+        [InlineKeyboardButton("Adicionar Novamente", callback_data="ajustar_comissao")],
+        [InlineKeyboardButton("Menu", callback_data="menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # Envia a mensagem com os botões
-    await query.message.reply_text("Selecione o tipo de faturamento:", reply_markup=reply_markup)
+    await update.message.reply_text("Acréscimo registrado com sucesso!", reply_markup=reply_markup)
 
 
 
+    
 
 
-
-
-
-
-
-
-
-# Função para exibir anos disponíveis
-async def selecionar_ano_faturamento_liquido(update: Update, context: CallbackContext):
+async def adicionar_desconto(update: Update, context: CallbackContext):
     query = update.callback_query
-    button_name = "Faturamento Mês"  # Nome do botão
-    log_usuario(update, button_name)  # Log para registrar quem clicou no botão
-    await query.answer()
-
-    try:
-        conn = mysql.connector.connect(**config)
-        cursor = conn.cursor()
-
-        # Obtém os anos distintos da tabela confirmados
-        cursor.execute("SELECT DISTINCT EXTRACT(YEAR FROM data) FROM confirmados ORDER BY 1 DESC")
-        anos = [str(row[0]) for row in cursor.fetchall()]
-
-        if not anos:
-            # Cria botões "Consultar Novamente" e "Menu"
-            keyboard = [
-                [InlineKeyboardButton("Consultar Novamente", callback_data="faturamentomes")],
-                [InlineKeyboardButton("Menu", callback_data="menu")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
-            await query.message.reply_text("Nenhum dado encontrado.", reply_markup=reply_markup)
-            return
-
-        # Cria botões para os anos
-        keyboard = [[InlineKeyboardButton(ano, callback_data=f"anofaturamentoliquido_{ano}")] for ano in anos]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        await query.message.reply_text("Selecione um ano:", reply_markup=reply_markup)
-
-    except mysql.connector.Error as err:
-        await query.message.reply_text(f"Erro ao acessar o banco de dados: {err}")
-    finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
-
-# Dicionário para mapear o número do mês para o nome do mês
-meses_nome = {
-    "1": "Janeiro", "2": "Fevereiro", "3": "Março", "4": "Abril", "5": "Maio", "6": "Junho",
-    "7": "Julho", "8": "Agosto", "9": "Setembro", "10": "Outubro", "11": "Novembro", "12": "Dezembro"
-}
-
-# Função para exibir meses disponíveis com base no ano selecionado
-async def selecionar_mes_faturamento_liquido(update: Update, context: CallbackContext):
-    query = update.callback_query
-    await query.answer()
-    ano_selecionado = query.data.split("_")[1]  # Extrai o ano da callback_data
-
-    try:
-        conn = mysql.connector.connect(**config)
-        cursor = conn.cursor()
-
-        # Obtém os meses disponíveis no ano selecionado
-        cursor.execute(f"SELECT DISTINCT EXTRACT(MONTH FROM data) FROM confirmados WHERE EXTRACT(YEAR FROM data) = {ano_selecionado} ORDER BY 1")
-        meses = [str(row[0]) for row in cursor.fetchall()]
-
-        if not meses:
-            await query.message.reply_text("Nenhum mês disponível para este ano.")
-            return
-
-        # Cria botões para os meses com os nomes em vez dos números
-        keyboard = [[InlineKeyboardButton(f"{meses_nome[mes]}", callback_data=f"mesfaturamentoliquido_{ano_selecionado}_{mes}")] for mes in meses]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        await query.message.reply_text(f"Selecione um mês:", reply_markup=reply_markup)
-
-    except mysql.connector.Error as err:
-        await query.message.reply_text(f"Erro ao acessar o banco de dados: {err}")
-    finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
-
-# Função para calcular e exibir o faturamento do mês selecionado
-async def exibir_faturamento_liquido(update: Update, context: CallbackContext):
-    query = update.callback_query
-    await query.answer()
-    _, ano, mes = query.data.split("_")  # Extrai ano e mês da callback_data
-
-    try:
-        conn = mysql.connector.connect(**config)
-        cursor = conn.cursor()
-
-        # Calcula o faturamento do período selecionado
-        cursor.execute(f"""
-            SELECT SUM(valor-comissao) as faturamento_liquido
-            FROM confirmados 
-            WHERE EXTRACT(YEAR FROM data) = {ano} 
-            AND EXTRACT(MONTH FROM data) = {mes}
-        """)
-        faturamento = cursor.fetchone()[0] or 0
-
-        # Formata a resposta com o faturamento
-        resposta = f"O faturamento líquido de {meses_nome[mes]} de {ano} é:\n\nR$ {faturamento:,.2f}"
-
-        # Define os botões "Menu" e "Consultar Novamente"
-        keyboard = [
-            [InlineKeyboardButton("Consultar Novamente", callback_data="faturamentomes")],
-            [InlineKeyboardButton("Menu", callback_data="menu")],
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        # Envia a mensagem para o usuário com os botões
-        await query.message.reply_text(
-            resposta,
-            reply_markup=reply_markup
-        )
-
-    except mysql.connector.Error as err:
-        await query.message.reply_text(f"Erro ao acessar o banco de dados: {err}")
-    finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# Função para exibir anos disponíveis
-async def selecionar_ano_faturamento_bruto(update: Update, context: CallbackContext):
-    query = update.callback_query
-    button_name = "Faturamento Mês"  # Nome do botão
-    log_usuario(update, button_name)  # Log para registrar quem clicou no botão
-    await query.answer()
-
-    try:
-        conn = mysql.connector.connect(**config)
-        cursor = conn.cursor()
-
-        # Obtém os anos distintos da tabela confirmados
-        cursor.execute("SELECT DISTINCT EXTRACT(YEAR FROM data) FROM confirmados ORDER BY 1 DESC")
-        anos = [str(row[0]) for row in cursor.fetchall()]
-
-        if not anos:
-            # Cria botões "Consultar Novamente" e "Menu"
-            keyboard = [
-                [InlineKeyboardButton("Consultar Novamente", callback_data="faturamentomes")],
-                [InlineKeyboardButton("Menu", callback_data="menu")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
-            await query.message.reply_text("Nenhum dado encontrado.", reply_markup=reply_markup)
-            return
-
-        # Cria botões para os anos
-        keyboard = [[InlineKeyboardButton(ano, callback_data=f"anofaturamentobruto_{ano}")] for ano in anos]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        await query.message.reply_text("Selecione um ano:", reply_markup=reply_markup)
-
-    except mysql.connector.Error as err:
-        await query.message.reply_text(f"Erro ao acessar o banco de dados: {err}")
-    finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
-
-# Dicionário para mapear o número do mês para o nome do mês
-meses_nome = {
-    "1": "Janeiro", "2": "Fevereiro", "3": "Março", "4": "Abril", "5": "Maio", "6": "Junho",
-    "7": "Julho", "8": "Agosto", "9": "Setembro", "10": "Outubro", "11": "Novembro", "12": "Dezembro"
-}
-
-# Função para exibir meses disponíveis com base no ano selecionado
-async def selecionar_mes_faturamento_bruto(update: Update, context: CallbackContext):
-    query = update.callback_query
-    await query.answer()
-    ano_selecionado = query.data.split("_")[1]  # Extrai o ano da callback_data
-
-    try:
-        conn = mysql.connector.connect(**config)
-        cursor = conn.cursor()
-
-        # Obtém os meses disponíveis no ano selecionado
-        cursor.execute(f"SELECT DISTINCT EXTRACT(MONTH FROM data) FROM confirmados WHERE EXTRACT(YEAR FROM data) = {ano_selecionado} ORDER BY 1")
-        meses = [str(row[0]) for row in cursor.fetchall()]
-
-        if not meses:
-            await query.message.reply_text("Nenhum mês disponível para este ano.")
-            return
-
-        # Cria botões para os meses com os nomes em vez dos números
-        keyboard = [[InlineKeyboardButton(f"{meses_nome[mes]}", callback_data=f"mesfaturamentobruto_{ano_selecionado}_{mes}")] for mes in meses]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        await query.message.reply_text(f"Selecione um mês:", reply_markup=reply_markup)
-
-    except mysql.connector.Error as err:
-        await query.message.reply_text(f"Erro ao acessar o banco de dados: {err}")
-    finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
-
-# Função para calcular e exibir o faturamento do mês selecionado
-async def exibir_faturamento_bruto(update: Update, context: CallbackContext):
-    query = update.callback_query
-    await query.answer()
-    _, ano, mes = query.data.split("_")  # Extrai ano e mês da callback_data
-
-    try:
-        conn = mysql.connector.connect(**config)
-        cursor = conn.cursor()
-
-        # Calcula o faturamento do período selecionado
-        cursor.execute(f"""
-            SELECT SUM(valor) as faturamento_bruto
-            FROM confirmados 
-            WHERE EXTRACT(YEAR FROM data) = {ano} 
-            AND EXTRACT(MONTH FROM data) = {mes}
-        """)
-        faturamento = cursor.fetchone()[0] or 0
-
-        # Formata a resposta com o faturamento
-        resposta = f"O faturamento bruto de {meses_nome[mes]} de {ano} é:\n\nR$ {faturamento:,.2f}"
-
-        # Define os botões "Menu" e "Consultar Novamente"
-        keyboard = [
-            [InlineKeyboardButton("Consultar Novamente", callback_data="faturamentomes")],
-            [InlineKeyboardButton("Menu", callback_data="menu")],
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        # Envia a mensagem para o usuário com os botões
-        await query.message.reply_text(
-            resposta,
-            reply_markup=reply_markup
-        )
-
-    except mysql.connector.Error as err:
-        await query.message.reply_text(f"Erro ao acessar o banco de dados: {err}")
-    finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
+    celular_barbeiro = query.data.split("_")[2]
+    context.user_data["celular_barbeiro"] = celular_barbeiro
+    context.user_data["aguardando_input"] = "DESCRICAO_DESCONTO"  # Define o estado correto
+
+    await query.message.reply_text("Qual descrição do desconto?")
+    return
+
+async def receber_descricao_desconto(update: Update, context: CallbackContext):
+    descricao = update.message.text
+    if re.search(r'\d', descricao):
+        await update.message.reply_text("A descrição não pode conter números. Digite novamente:")
+        return
+    
+    context.user_data["descricao"] = descricao
+    context.user_data["aguardando_input"] = "VALOR_DESCONTO"  # Define corretamente o próximo estado
+    
+    await update.message.reply_text("Qual valor do desconto?")
+
+
+async def receber_valor_desconto(update: Update, context: CallbackContext):
+    valor = update.message.text.replace(",", ".")
+
+    if not re.match(r'^[0-9]+(\.[0-9]{1,2})?$', valor):
+        await update.message.reply_text("O valor deve ser numérico. Digite novamente:")
+        return
+
+    celular_barbeiro = context.user_data["celular_barbeiro"]
+    descricao = context.user_data["descricao"]
+    data_atual = datetime.now().strftime('%Y-%m-%d')
+
+    # Insere os dados no banco
+    conn = mysql.connector.connect(**config)
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO taxas (data, celular_barbeiro, tipo, descricao, valor) VALUES (%s, %s, %s, %s, %s)",
+                   (data_atual, celular_barbeiro, "Desconto", descricao, valor))
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    # Limpa o contexto
+    context.user_data.pop("aguardando_input", None)
+    context.user_data.pop("descricao", None)
+    context.user_data.pop("celular_barbeiro", None)
+
+    # Define os botões "Adicionar Novamente" e "Menu"
+    keyboard = [
+        [InlineKeyboardButton("Adicionar Novamente", callback_data="ajustar_comissao")],
+        [InlineKeyboardButton("Menu", callback_data="menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text("Desconto registrado com sucesso!", reply_markup=reply_markup)
 
 
 
@@ -2142,38 +2364,33 @@ async def button_handler(update: Update, context: CallbackContext):
 
     elif query.data == "faturamentomes":
         # Chama a função para selecionar tipo de faturamento
-        await selecionar_tipo_faturamento(update, context)
+        await selecionar_ano_faturamento(update, context)
 
-    elif query.data == "faturamentoliquido":
-        # Chama a função de selecionar ano para faturamento líquido
-        await selecionar_ano_faturamento_liquido(update, context)
-
-
-    elif query.data.startswith("anofaturamentoliquido_"):
+    elif query.data.startswith("anofaturamento_"):
         # Chama a função de selecionar mês
-        await selecionar_mes_faturamento_liquido(update, context)
-    elif query.data.startswith("mesfaturamentoliquido_"):
+        await selecionar_mes_faturamento(update, context)
+    elif query.data.startswith("mesfaturamento_"):
         # Chama a função de exibir faturamento
-        await exibir_faturamento_liquido(update, context)
+        await exibir_faturamento(update, context)
 
 
 
 
+    elif query.data.startswith("ajustar_comissao"):
+        # Chama a função para exibir os barbeiros
+        await ajustar_comissao(update, context)
 
-    elif query.data == "faturamentobruto":
-        # Chama a função de selecionar ano para faturamento bruto
-        await selecionar_ano_faturamento_bruto(update, context)    
+    elif query.data.startswith("barbeiro_"):
+        # Chama a função para exibir detalhes do barbeiro selecionado
+        await detalhes_barbeiro(update, context)
 
+    elif query.data.startswith("adicionar_acrescimo_"):
+        # Chama a função para adicionar acréscimo
+        await adicionar_acrescimo(update, context)
 
-    elif query.data.startswith("anofaturamentobruto_"):
-        # Chama a função de selecionar mês
-        await selecionar_mes_faturamento_bruto(update, context)
-    elif query.data.startswith("mesfaturamentobruto_"):
-        # Chama a função de exibir faturamento
-        await exibir_faturamento_bruto(update, context)
-
-
-
+    elif query.data.startswith("adicionar_desconto_"):
+        # Chama a função para adicionar desconto
+        await adicionar_desconto(update, context)
 
 
 
@@ -2194,7 +2411,23 @@ async def entrada_usuario(update: Update, context: CallbackContext):
     # Verifica se há um contexto específico em andamento
     if context.user_data.get("aguardando_input") == "lista_barbeiro":
         await lista_barbeiro(update, context)
-        return  # Sai da função após tratar o contexto específico
+        return
+
+    elif context.user_data.get("aguardando_input") == "DESCRICAO_ACRESCIMO":
+        await receber_descricao_acrescimo(update, context)
+        return
+
+    elif context.user_data.get("aguardando_input") == "VALOR_ACRESCIMO":
+        await receber_valor_acrescimo(update, context)
+        return
+
+    elif context.user_data.get("aguardando_input") == "DESCRICAO_DESCONTO":
+        await receber_descricao_desconto(update, context)
+        return
+
+    elif context.user_data.get("aguardando_input") == "VALOR_DESCONTO":
+        await receber_valor_desconto(update, context)
+        return
 
     # Se a mensagem não for um comando reconhecido, redireciona para o menu
     if update.message.text not in ['/start', '/menu']:

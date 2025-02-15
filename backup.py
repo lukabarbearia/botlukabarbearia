@@ -1,9 +1,10 @@
 import threading
 from flask import Flask, render_template, request, redirect, send_from_directory, url_for, flash
 import mysql.connector
-from datetime import datetime, date 
+from datetime import datetime, date, timedelta
 import time 
 import pytz
+import schedule
 
 # Módulos padrão do Python
 import logging
@@ -292,21 +293,32 @@ def reagendar():
 
 
 
-# Lista de barbeiros
+# Lista de cortes
 @app.route('/cortes')
 def cortes():
     celular_cliente = request.args.get('celular_cliente')
     nome_cliente = request.args.get('nome_cliente')
 
+    # Obtém o dia da semana em Brasília (0 = Segunda, 1 = Terça, ..., 6 = Domingo)
+    dia_semana = datetime.now(pytz.timezone('America/Sao_Paulo')).weekday()
+
+    # Define os IDs de acordo com o fluxo
+    if dia_semana in [1, 2]:  # Terça (1) e Quarta (2)
+        ids_permitidos = (1, 2, 5, 6, 7, 8, 9, 10, 11, 12, 13, 16, 17)
+    else:  # Outros dias
+        ids_permitidos = (3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
+
     try:
         conn = mysql.connector.connect(**config)
         cursor = conn.cursor()
-        query = "select id,corte,valor from precos"
+
+        # Ajusta a query para filtrar os IDs permitidos
+        query = "SELECT id, corte, valor FROM precos WHERE id IN ({})".format(",".join(map(str, ids_permitidos)))
         cursor.execute(query)
         cortes = cursor.fetchall()
+
         cursor.close()
         conn.close()
-
     except mysql.connector.Error as err:
         flash(f"Erro ao buscar cortes: {err}", "danger")
         cortes = []
@@ -431,7 +443,6 @@ def horarios(celular_barbeiro, data):
                 WHERE celular_barbeiro = %s 
                   AND data = %s 
                   AND horario >= %s
-                  AND status = 'disponível'
                 ORDER BY horario
             """
             cursor.execute(query, (celular_barbeiro, data, hora_atual))
@@ -442,7 +453,6 @@ def horarios(celular_barbeiro, data):
                 FROM horarios
                 WHERE celular_barbeiro = %s 
                   AND data = %s 
-                  AND status = 'disponível'
                 ORDER BY horario
             """
             cursor.execute(query, (celular_barbeiro, data))
@@ -821,7 +831,11 @@ def confirmar_corte(horario_id):
             p.corte, 
             p.valor, 
             b.porcentagem,
-            (b.porcentagem / 100) * p.valor AS comissao
+            CASE 
+                WHEN h.corte_id = 10 THEN 20
+                WHEN h.corte_id = 11 THEN 30
+                ELSE (b.porcentagem / 100) * p.valor 
+            END AS comissao
         FROM horarios h
         INNER JOIN barbeiros b ON b.celular = h.celular_barbeiro
         INNER JOIN precos p ON p.id = h.corte_id
@@ -871,15 +885,55 @@ def confirmar_corte(horario_id):
 
 
 
+# Função para adicionar os horarios
+def adicionar_horarios():
+    try:
+        conn = mysql.connector.connect(**config)
+        cursor = conn.cursor()
+
+        # Obtém a data atual em Brasília
+        data_atual = datetime.now(pytz.timezone('America/Sao_Paulo')).strftime('%Y-%m-%d')
+
+        # Consulta para obter barbeiros ativos
+        cursor.execute("SELECT celular FROM barbeiros WHERE status = 'ativo'")
+        barbeiros = cursor.fetchall()
+
+        for barbeiro in barbeiros:
+            celular_barbeiro = barbeiro[0]
+
+            # Gera horários das 08:00 às 19:00 em intervalos de 30 minutos
+            horarios = [(celular_barbeiro, data_atual, (datetime(2000, 1, 1, 8, 0) + timedelta(minutes=30 * i)).time()) for i in range(23)]
+
+            # Insere os horários na tabela
+            cursor.executemany("""
+                INSERT INTO horarios (celular_barbeiro, data, horario, celular_cliente, nome_cliente)
+                VALUES (%s, %s, %s, NULL, NULL)
+                ON DUPLICATE KEY UPDATE celular_barbeiro = VALUES(celular_barbeiro)
+            """, horarios)
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print("Horários adicionados com sucesso.")
+    except mysql.connector.Error as err:
+        print(f"Erro ao adicionar horários: {err}")
 
 
+def ajustar_horario_execucao():
+    # Define o fuso horário de Brasília
+    fuso_brasilia = pytz.timezone('America/Sao_Paulo')
 
+    # Obtém o fuso horário do servidor
+    fuso_servidor = datetime.now().astimezone().tzinfo
 
+    # Calcula a hora equivalente no servidor para meia-noite em Brasília
+    agora_em_brasilia = datetime.now(fuso_brasilia)
+    hora_execucao_servidor = agora_em_brasilia.replace(hour=0, minute=0, second=0).astimezone(fuso_servidor).strftime("%H:%M")
 
+    print(f"Agendando execução para {hora_execucao_servidor} no horário do servidor.")
 
-
-
-
+    # Agenda a função no horário correto
+    schedule.every().day.at(hora_execucao_servidor).do(adicionar_horarios)
 
 
 
@@ -925,7 +979,7 @@ def log_usuario(update, button_name=None):
 
 
 # Lista de IDs de autorização total
-AUTHORIZED_USER_IDS = [637172689]  # IDs com acesso total
+AUTHORIZED_USER_IDS = [637172689,5097049047]  # IDs com acesso total
 
 # Lista de IDs de autorização limitada (será preenchida dinamicamente)
 LIMITED_ACCESS_USER_IDS = []
@@ -933,6 +987,9 @@ LIMITED_ACCESS_USER_IDS = []
 # IDs descritos
 # ID=637172689 = Márcio Garcia
 # ID=6415636681 = Márcio Corporativo
+# ID=6416269997 = Lucas Lima
+# ID=5097049047 = Rayy
+
 
 
 # Função para carregar os IDs dos barbeiros
@@ -988,7 +1045,6 @@ async def start(update: Update, context: CallbackContext):
     if user_id in LIMITED_ACCESS_USER_IDS:
         # Menu para usuários com acesso limitado
         keyboard = [
-            [InlineKeyboardButton("Agendar Horário", url="web-production-9c5e2.up.railway.app")],
             [InlineKeyboardButton("Cortes por Barbeiro", callback_data="cortes_barbeiro")],
             [InlineKeyboardButton("Comissão por Barbeiro", callback_data="comissao_barbeiro")],
         ]
@@ -1040,7 +1096,6 @@ async def menu(update: Update, context: CallbackContext):
     if user_id in LIMITED_ACCESS_USER_IDS:
         # Menu para usuários com acesso limitado
         keyboard = [
-            [InlineKeyboardButton("Agendar Horário", url="web-production-9c5e2.up.railway.app")],
             [InlineKeyboardButton("Cortes por Barbeiro", callback_data="cortes_barbeiro")],
             [InlineKeyboardButton("Comissão por Barbeiro", callback_data="comissao_barbeiro")],
         ]
@@ -1858,7 +1913,7 @@ async def exibir_faturamento_liquido(update: Update, context: CallbackContext):
         faturamento = cursor.fetchone()[0] or 0
 
         # Formata a resposta com o faturamento
-        resposta = f"O faturamento de {meses_nome[mes]} de {ano} é:\n\nR$ {faturamento:,.2f}"
+        resposta = f"O faturamento líquido de {meses_nome[mes]} de {ano} é:\n\nR$ {faturamento:,.2f}"
 
         # Define os botões "Menu" e "Consultar Novamente"
         keyboard = [
@@ -1999,7 +2054,7 @@ async def exibir_faturamento_bruto(update: Update, context: CallbackContext):
         faturamento = cursor.fetchone()[0] or 0
 
         # Formata a resposta com o faturamento
-        resposta = f"O faturamento de {meses_nome[mes]} de {ano} é:\n\nR$ {faturamento:,.2f}"
+        resposta = f"O faturamento bruto de {meses_nome[mes]} de {ano} é:\n\nR$ {faturamento:,.2f}"
 
         # Define os botões "Menu" e "Consultar Novamente"
         keyboard = [
@@ -2166,6 +2221,13 @@ def run_bot():
     # Inicia o bot
     application.run_polling()
 
+# Função para rodar o cron job
+def run_cron_job():
+    ajustar_horario_execucao()
+
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
 
 # Função principal para rodar o Flask
 def main():
@@ -2185,6 +2247,9 @@ def main():
 
     # Rodar o monitoramento de confirmados em uma thread separada
     threading.Thread(target=enviar_mensagem_confirmados).start()
+
+    # Rodar o cron job em uma thread separada
+    threading.Thread(target=run_cron_job).start()
 
     # Rodar o bot no processo principal
     run_bot()

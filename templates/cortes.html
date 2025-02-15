@@ -53,6 +53,34 @@
             color: #fffae6;
         }
 
+        .grupo {
+            margin-bottom: 20px;
+        }
+
+        .grupo button {
+            background-color: #4f6d7a;
+            color: #fffae6;
+            border: none;
+            border-radius: 10px;  /* Adiciona bordas arredondadas */
+            padding: 10px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            width: 100%;
+            text-align: center;
+            outline: none;
+            transition: background-color 0.3s ease;
+        }
+
+        .grupo button:hover {
+            background-color: #365060;
+        }
+
+        .grupo-content {
+            display: none;
+            border-top: 1px solid #fff;
+            padding-top: 10px;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -129,30 +157,44 @@
             }
         }
     </style>
+    <script>
+        function toggleGroupContent(group) {
+            var content = document.getElementById('group-content-' + group);
+            content.style.display = (content.style.display === 'none' || content.style.display === '') ? 'block' : 'none';
+        }
+    </script>
 </head>
 <body>
     <div class="container">
         <h2 style="color: #fff;">Selecione um Corte</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>Cortes</th>
-                    <th>Preços</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for corte in cortes %}
-                <tr>
-                    <td>
-                        <a href="{{ url_for('barbeiros', celular_barbeiro=celular, celular_cliente=celular_cliente, corte_id=corte[0]) }}">
-                            {{ corte[1] }}
-                        </a>
-                    </td>
-                    <td class="price">R$ {{ corte[2] }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+
+        {% for grupo, cortes in grupos.items() %}
+        <div class="grupo">
+            <button onclick="toggleGroupContent('{{ loop.index0 }}')">{{ grupo }}</button>
+            <div id="group-content-{{ loop.index0 }}" class="grupo-content">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Cortes</th>
+                            <th>Preços</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for corte in cortes %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('barbeiros', celular_barbeiro=celular, celular_cliente=celular_cliente, corte_id=corte[0]) }}">
+                                    {{ corte[1] }}
+                                </a>
+                            </td>
+                            <td class="price">R$ {{ corte[2] }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endfor %}
     </div>
 </body>
 </html>

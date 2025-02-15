@@ -145,7 +145,7 @@
                 <tr>
                     <td>{{ horario }}</td>
                     <td>
-                        <form action="{{ url_for('confirmar_corte', horario_id=id) }}" method="post">
+                        <form action="{{ url_for('selecionar_pagamento', horario_id=id) }}" method="get">
                             <button type="submit">{{ nome_cliente }}</button>
                         </form>
                     </td>
