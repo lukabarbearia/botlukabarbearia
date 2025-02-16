@@ -1027,7 +1027,7 @@ def carregar_ids_barbeiros():
         cursor = conn.cursor(dictionary=True)
 
         # Consulta para obter os IDs dos barbeiros
-        cursor.execute("SELECT id_telegram FROM barbeiros")
+        cursor.execute("SELECT id_telegram FROM barbeiros where status = 'ativo'")
         barbeiros = cursor.fetchall()
 
         # Preenche a lista LIMITED_ACCESS_USER_IDS
@@ -1527,7 +1527,7 @@ async def exibir_cortes(update: Update, context: CallbackContext):
             INNER JOIN barbeiros b ON b.celular = c.celular_barbeiro 
             INNER JOIN clientes cl ON cl.celular = c.celular_cliente 
             WHERE b.id_telegram = %s AND YEAR(c.data) = %s AND MONTH(c.data) = %s
-            ORDER BY C.data, C.horario
+            ORDER BY c.data, c.horario
         """, (id_telegram, ano, mes))
         cortes = cursor.fetchall()
 
