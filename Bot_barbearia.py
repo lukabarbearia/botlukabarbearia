@@ -13,6 +13,7 @@ import logging
 import datetime  # Importa o módulo completo para evitar conflitos
 from datetime import datetime
 import requests
+import os
 
 
 # Bibliotecas do Telegram
@@ -31,6 +32,9 @@ from telegram.ext import (
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("telegram").setLevel(logging.CRITICAL)
 
+# Desativa logs HTTP do Flask no console
+if os.getenv("RAILWAY_ENVIRONMENT"):
+    logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
 app = Flask(__name__)
 app.secret_key = "{k>9IysL&3DQ?cl8rcP4"
@@ -1234,16 +1238,11 @@ async def lista_barbeiro(update: Update, context: CallbackContext):
 
 
 def verificar_horario():
-    """Verifica se o horário está dentro do permitido (08h às 20h) e se não é domingo."""
+    """Verifica se o horário está dentro do permitido (08h às 21h) todos os dias da semana."""
     agora = datetime.now(pytz.timezone('America/Sao_Paulo'))
     hora_atual = agora.hour
-    dia_semana = agora.weekday()  # 0 = segunda-feira, 6 = domingo
 
-    if dia_semana == 6:  # Domingo
-        return False
-    if 8 <= hora_atual < 21:  # Entre 08h e 21h
-        return True
-    return False
+    return 8 <= hora_atual < 21  # Permite entre 08h e 21h
 
 
 
