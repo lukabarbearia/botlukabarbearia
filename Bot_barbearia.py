@@ -1298,10 +1298,8 @@ Deixa tudo na régua, hein? 📏✂️
             time.sleep(5)  # Espera 5 segundos antes de rodar novamente
         else:
             if datetime.now(pytz.timezone('America/Sao_Paulo')).hour >= 21:
-                print("Fora do horário permitido. Aguardando 12 horas para reiniciar...")
                 time.sleep(12 * 60 * 60)  # Aguarda 12 horas (caso seja após as 20h)
             else:
-                print("Aguardando para iniciar às 08h...")
                 time.sleep(60 * 60)  # Aguarda 1 hora se ainda não for 08h
 
 def enviar_mensagem_confirmados():
@@ -1364,10 +1362,8 @@ Bora continuar arrasando!💪🔥
             time.sleep(5)  # Espera 5 segundos antes de rodar novamente
         else:
             if datetime.now(pytz.timezone('America/Sao_Paulo')).hour >= 21:
-                print("Fora do horário permitido. Aguardando 12 horas para reiniciar...")
                 time.sleep(12 * 60 * 60)  # Aguarda 12 horas
             else:
-                print("Aguardando para iniciar às 08h...")
                 time.sleep(60 * 60)  # Aguarda 1 hora se ainda não for 08h
 
 
