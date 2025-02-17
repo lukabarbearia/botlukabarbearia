@@ -456,7 +456,6 @@ def horarios(celular_barbeiro, data):
                 FROM horarios
                 WHERE celular_barbeiro = %s 
                   AND data = %s 
-                  AND horario >= %s
                 ORDER BY horario
             """
             cursor.execute(query, (celular_barbeiro, data, hora_atual))
