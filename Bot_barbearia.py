@@ -76,23 +76,22 @@ def login():
             if result:
                 nome_cliente = result[0]
 
-                # Obtendo a data e o horário atuais em Brasília
+                # Obtendo a data atual em Brasília
                 now = datetime.now(pytz.timezone('America/Sao_Paulo'))
                 current_date = now.strftime('%Y-%m-%d')  # Formato: '2025-01-20'
-                current_time = now.strftime('%H:%M:%S')  # Formato: '02:43:25'
 
-
-                # Obtendo as informações do horário reservado
+                # Obtendo as informações do horário reservado apenas para a data atual
                 horario_query = """
                 SELECT h.id, h.celular_barbeiro, b.nome, DATE_FORMAT(h.data, '%d/%m/%Y') AS data, TIME_FORMAT(h.horario, '%H:%i') AS horario, p.corte, p.valor
                 FROM horarios h
                 INNER JOIN barbeiros b ON b.celular = h.celular_barbeiro
-                INNER join precos p on p.id = h.corte_id 
-                WHERE h.celular_cliente = %s AND h.status = 'reservado'
-                AND (h.data > %s OR (h.data = %s AND h.horario > %s))
+                INNER JOIN precos p ON p.id = h.corte_id 
+                WHERE h.celular_cliente = %s 
+                AND h.status = 'reservado'
+                AND h.data = %s
                 ORDER BY h.id DESC LIMIT 1
                 """
-                cursor.execute(horario_query, (celular, current_date, current_date, current_time))
+                cursor.execute(horario_query, (celular, current_date))
                 horario_info = cursor.fetchone()
 
                 if horario_info:
@@ -115,7 +114,7 @@ def login():
                                            horario_id=None)  # Sem horário reservado
 
             else:
-                flash("celular não cadastrado. Por favor, cadastre-se abaixo.", "info")
+                flash("Celular não cadastrado. Por favor, cadastre-se abaixo.", "info")
                 return redirect(url_for('cadastro', celular=celular))
 
         except mysql.connector.Error as err:
@@ -169,22 +168,22 @@ def bemvindo():
         conn = mysql.connector.connect(**config)
         cursor = conn.cursor()
 
-        # Obtendo a data e o horário atuais em Brasília
+        # Obtendo a data atual em Brasília
         now = datetime.now(pytz.timezone('America/Sao_Paulo'))
         current_date = now.strftime('%Y-%m-%d')  # Formato: '2025-01-20'
-        current_time = now.strftime('%H:%M:%S')  # Formato: '02:43:25'
 
-        # Obtendo as informações do horário reservado
+        # Obtendo as informações do horário reservado apenas para a data atual
         horario_query = """
         SELECT h.id, h.celular_barbeiro, b.nome, DATE_FORMAT(h.data, '%d/%m/%Y') AS data, TIME_FORMAT(h.horario, '%H:%i') AS horario, p.corte, p.valor
         FROM horarios h
         INNER JOIN barbeiros b ON b.celular = h.celular_barbeiro
-        INNER join precos p on p.id = h.corte_id 
-        WHERE h.celular_cliente = %s AND h.status = 'reservado'
-          AND (h.data > %s OR (h.data = %s AND h.horario > %s))
+        INNER JOIN precos p ON p.id = h.corte_id 
+        WHERE h.celular_cliente = %s 
+        AND h.status = 'reservado'
+        AND h.data = %s
         ORDER BY h.id DESC LIMIT 1
         """
-        cursor.execute(horario_query, (celular_cliente, current_date, current_date, current_time))
+        cursor.execute(horario_query, (celular_cliente, current_date))
         horario_info = cursor.fetchone()
 
         if horario_info:
@@ -442,33 +441,15 @@ def horarios(celular_barbeiro, data):
         conn = mysql.connector.connect(**config)
         cursor = conn.cursor()
 
-        # Obter o horário atual em Brasília no formato HH:MM:SS
-        now = datetime.now(pytz.timezone('America/Sao_Paulo'))
-        hora_atual = now.time()
-        # Obter a data atual em Brasília
-        data_atual = now.date()
-
-        # Ajustar a consulta SQL com base na data selecionada
-        if data_obj == data_atual:
-            # Se a data selecionada for o dia atual, filtrar horários >= hora atual
-            query = """
-                SELECT horario, status
-                FROM horarios
-                WHERE celular_barbeiro = %s 
-                  AND data = %s 
-                ORDER BY horario
-            """
-            cursor.execute(query, (celular_barbeiro, data, hora_atual))
-        else:
-            # Se a data selecionada for futura, não filtrar pelo horário
-            query = """
-                SELECT horario, status
-                FROM horarios
-                WHERE celular_barbeiro = %s 
-                  AND data = %s 
-                ORDER BY horario
-            """
-            cursor.execute(query, (celular_barbeiro, data))
+        # Consulta SQL para obter todos os horários do dia, independente da data
+        query = """
+            SELECT horario, status
+            FROM horarios
+            WHERE celular_barbeiro = %s 
+              AND data = %s 
+            ORDER BY horario
+        """
+        cursor.execute(query, (celular_barbeiro, data))
 
         horarios_raw = cursor.fetchall()
         cursor.close()
