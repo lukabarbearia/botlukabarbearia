@@ -322,15 +322,15 @@ def cortes():
     # Organiza os cortes em grupos de acordo com o dia da semana
     if dia_semana in [1, 2]:  # Terça (1) e Quarta (2)
         grupos = {
-            "Combos Promoção": [corte for corte in cortes if corte[0] in [7, 8, 9, 10, 11, 12]],
-            "Cortes Promoção": [corte for corte in cortes if corte[0] in [14, 16, 18]],
+            "Combos Promoção": [corte for corte in cortes if corte[0] in [7, 8, 9, 10, 11, 12, 29, 30, 31]],
+            "Cortes Promoção": [corte for corte in cortes if corte[0] in [14, 16, 18, 28]],
             "Barba & Sobrancelha": [corte for corte in cortes if corte[0] in [19, 20, 21]],
             "Pinturas & Finalizações": [corte for corte in cortes if corte[0] in [22, 23, 24, 25, 26, 27]]
         }
     else:  # Outros dias
         grupos = {
-            "Combos": [corte for corte in cortes if corte[0] in [1, 2, 3, 4, 5, 6]],
-            "Cortes Individuais": [corte for corte in cortes if corte[0] in [13, 15, 17]],
+            "Combos": [corte for corte in cortes if corte[0] in [1, 2, 3, 4, 5, 6, 29, 30, 31]],
+            "Cortes Individuais": [corte for corte in cortes if corte[0] in [13, 15, 17, 28]],
             "Barba & Sobrancelha": [corte for corte in cortes if corte[0] in [19, 20, 21]],
             "Pinturas & Finalizações": [corte for corte in cortes if corte[0] in [22, 23, 24, 25, 26, 27]]
         }
