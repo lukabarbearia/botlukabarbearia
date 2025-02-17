@@ -990,25 +990,24 @@ TELEGRAM_TOKEN = "7304207853:AAE7YR1AbSquFBttKrI52vjEjJWic20ahjA"
 TELEGRAM_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
 
 
-# Configurar o logger com um formato mais detalhado
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
-)
-
+# Configurar o logger
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 
 # Função para registrar informações do usuário e do comando
 def log_usuario(update, button_name=None):
     user_id = update.effective_user.id  # Obtém o ID do usuário
     user_name = update.effective_user.full_name  # Obtém o nome completo do usuário
-    data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # Corrigido para datetime.now()
+    data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # Data/hora formatada
     comando = update.message.text if update.message else "Botão clicado"
+    
     if button_name:
         comando = f"Botão {button_name} clicado"
-    logger.info(f"Informação {comando} recebido em {data_hora} ID={user_id}, Usuário={user_name}")
+
+    print(f"Informação {comando} recebido em {data_hora} ID={user_id}, Usuário={user_name}")
+
 
 
 
