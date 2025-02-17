@@ -841,6 +841,7 @@ def confirmar_corte(horario_id, pagamento):
             CASE 
                 WHEN h.corte_id = 24 THEN 20
                 WHEN h.corte_id = 25 THEN 30
+                WHEN h.corte_id = 22 THEN 10
                 ELSE (b.porcentagem / 100) * p.valor 
             END AS comissao,
             %s
