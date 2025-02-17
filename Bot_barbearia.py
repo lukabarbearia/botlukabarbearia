@@ -1060,6 +1060,7 @@ async def start(update: Update, context: CallbackContext):
     if user_id in LIMITED_ACCESS_USER_IDS:
         # Menu para usuários com acesso limitado
         keyboard = [
+            [InlineKeyboardButton("Agendar Horário", url="web-production-9c5e2.up.railway.app")],
             [InlineKeyboardButton("Cortes por Barbeiro", callback_data="cortes_barbeiro")],
             [InlineKeyboardButton("Comissão por Barbeiro", callback_data="comissao_barbeiro")],
         ]
@@ -1112,6 +1113,7 @@ async def menu(update: Update, context: CallbackContext):
     if user_id in LIMITED_ACCESS_USER_IDS:
         # Menu para usuários com acesso limitado
         keyboard = [
+            [InlineKeyboardButton("Agendar Horário", url="web-production-9c5e2.up.railway.app")],
             [InlineKeyboardButton("Cortes por Barbeiro", callback_data="cortes_barbeiro")],
             [InlineKeyboardButton("Comissão por Barbeiro", callback_data="comissao_barbeiro")],
         ]
