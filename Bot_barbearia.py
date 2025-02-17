@@ -990,10 +990,14 @@ TELEGRAM_TOKEN = "7304207853:AAE7YR1AbSquFBttKrI52vjEjJWic20ahjA"
 TELEGRAM_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
 
 
-# Configurar o logger
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Configurar o logger com um formato mais detalhado
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
 
+logger = logging.getLogger(__name__)
 
 
 # Função para registrar informações do usuário e do comando
