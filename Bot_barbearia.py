@@ -1056,21 +1056,13 @@ async def start(update: Update, context: CallbackContext):
         )
         return
 
-    # Define o menu com base na autorização
-    if user_id in LIMITED_ACCESS_USER_IDS:
-        # Menu para usuários com acesso limitado
-        keyboard = [
-            [InlineKeyboardButton("Agendar Horário", url="web-production-9c5e2.up.railway.app")],
-            [InlineKeyboardButton("Cortes por Barbeiro", callback_data="cortes_barbeiro")],
-            [InlineKeyboardButton("Comissão por Barbeiro", callback_data="comissao_barbeiro")],
-        ]
-        welcome_message = f"Olá, {user_name}! 👋\nBem-vindo ao *Bot Luka Barbearia*! 💪\n\nAqui estão as opções disponíveis no menu:"
-    else:
+    # Prioriza a autorização total se o usuário estiver em ambas as listas
+    if user_id in map(str, AUTHORIZED_USER_IDS):
         # Menu para usuários com acesso total
         keyboard = [
             [InlineKeyboardButton("Agendar Horário", url="web-production-9c5e2.up.railway.app")],
-            [InlineKeyboardButton("Cadastrar Barbeiro", url="web-production-9c5e2.up.railway.app/consultar_barbeiro")],
             [InlineKeyboardButton("Confirmar Corte", url="web-production-9c5e2.up.railway.app/selecionar_barbeiro")],
+            [InlineKeyboardButton("Cadastrar Barbeiro", url="web-production-9c5e2.up.railway.app/consultar_barbeiro")],
             [InlineKeyboardButton("Lista Barbeiros", callback_data="lista_barbeiro")],
             [InlineKeyboardButton("Cortes por Barbeiro", callback_data="cortes_barbeiro")],
             [InlineKeyboardButton("Comissão por Barbeiro", callback_data="comissao_barbeiro")],
@@ -1078,7 +1070,16 @@ async def start(update: Update, context: CallbackContext):
             [InlineKeyboardButton("Faturamento Mês", callback_data="faturamentomes")],
         ]
         welcome_message = f"Olá, {user_name}! 👋\nBem-vindo ao *Bot Luka Barbearia*! 💪\n\nAqui estão as opções disponíveis no menu:"
-
+    
+    else:
+        # Menu para usuários com acesso limitado
+        keyboard = [
+            [InlineKeyboardButton("Agendar Horário", url="web-production-9c5e2.up.railway.app")],
+            [InlineKeyboardButton("Cortes por Barbeiro", callback_data="cortes_barbeiro")],
+            [InlineKeyboardButton("Comissão por Barbeiro", callback_data="comissao_barbeiro")],
+        ]
+        welcome_message = f"Olá, {user_name}! 👋\nBem-vindo ao *Bot Luka Barbearia*! 💪\n\nAqui estão as opções disponíveis no menu:"
+    
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     # Envia a mensagem de boas-vindas com o menu
@@ -1109,26 +1110,27 @@ async def menu(update: Update, context: CallbackContext):
         )
         return
 
-    # Define o menu com base na autorização
-    if user_id in LIMITED_ACCESS_USER_IDS:
-        # Menu para usuários com acesso limitado
-        keyboard = [
-            [InlineKeyboardButton("Agendar Horário", url="web-production-9c5e2.up.railway.app")],
-            [InlineKeyboardButton("Cortes por Barbeiro", callback_data="cortes_barbeiro")],
-            [InlineKeyboardButton("Comissão por Barbeiro", callback_data="comissao_barbeiro")],
-        ]
-        message_text = "Escolha uma opção:"
-    else:
+    # Prioriza a autorização total se o usuário estiver em ambas as listas
+    if user_id in map(str, AUTHORIZED_USER_IDS):
         # Menu para usuários com acesso total
         keyboard = [
             [InlineKeyboardButton("Agendar Horário", url="web-production-9c5e2.up.railway.app")],
-            [InlineKeyboardButton("Cadastrar Barbeiro", url="web-production-9c5e2.up.railway.app/consultar_barbeiro")],
             [InlineKeyboardButton("Confirmar Corte", url="web-production-9c5e2.up.railway.app/selecionar_barbeiro")],
+            [InlineKeyboardButton("Cadastrar Barbeiro", url="web-production-9c5e2.up.railway.app/consultar_barbeiro")],
             [InlineKeyboardButton("Lista Barbeiros", callback_data="lista_barbeiro")],
             [InlineKeyboardButton("Cortes por Barbeiro", callback_data="cortes_barbeiro")],
             [InlineKeyboardButton("Comissão por Barbeiro", callback_data="comissao_barbeiro")],
             [InlineKeyboardButton("Ajustar Comissão", callback_data="ajustar_comissao")],
             [InlineKeyboardButton("Faturamento Mês", callback_data="faturamentomes")],
+        ]
+        message_text = "Escolha uma opção:"
+    
+    else:
+        # Menu para usuários com acesso limitado
+        keyboard = [
+            [InlineKeyboardButton("Agendar Horário", url="web-production-9c5e2.up.railway.app")],
+            [InlineKeyboardButton("Cortes por Barbeiro", callback_data="cortes_barbeiro")],
+            [InlineKeyboardButton("Comissão por Barbeiro", callback_data="comissao_barbeiro")],
         ]
         message_text = "Escolha uma opção:"
 
@@ -1268,7 +1270,7 @@ Deixa tudo na régua, hein? 📏✂️
                     """
                     
                     if enviar_mensagem(msg['id_telegram'], mensagem_texto):
-                        print(f"Mensagem enviada com sucesso para o ID {msg['id_telegram']} {msg['nome_barbeiro']}")
+                        print(f"Mensagem de agendamento enviada com sucesso para o ID {msg['id_telegram']} {msg['nome_barbeiro']}")
                         cursor.execute("UPDATE mensagem SET status = 'enviado' WHERE id = %s", (msg['id'],))
                         conn.commit()
                 
@@ -1281,8 +1283,10 @@ Deixa tudo na régua, hein? 📏✂️
             time.sleep(5)  # Espera 5 segundos antes de rodar novamente
         else:
             if datetime.now(pytz.timezone('America/Sao_Paulo')).hour >= 21:
+                print("Fora do horário permitido. Aguardando 12 horas para reiniciar...")
                 time.sleep(12 * 60 * 60)  # Aguarda 12 horas (caso seja após as 20h)
             else:
+                print("Aguardando para iniciar às 08h...")
                 time.sleep(60 * 60)  # Aguarda 1 hora se ainda não for 08h
 
 def enviar_mensagem_confirmados():
@@ -1323,14 +1327,17 @@ O cliente saiu satisfeito e o caixa agradece!💸
 Bora continuar arrasando!💪🔥
                     """
                     
-                    # Envia a mensagem para o ID fixo e para o barbeiro
-                    ids_destinatarios = [637172689,6416269997]
+                    # Envia a mensagem para o ID fixo (Márcio Garcia) e para o barbeiro
+                    ids_destinatarios = [
+                        (637172689, "Márcio Garcia"),
+                        (6416269997, "Lucas Lima")                    
+                    ]
                     if conf['id_telegram']:
-                        ids_destinatarios.append(conf['id_telegram'])
+                        ids_destinatarios.append((conf['id_telegram'], conf['nome_barbeiro']))
                     
-                    for id_dest in ids_destinatarios:
+                    for id_dest, nome_dest in ids_destinatarios:
                         if enviar_mensagem(id_dest, mensagem_texto):
-                            print(f"Mensagem enviada com sucesso para o ID {id_dest}")
+                            print(f"Mensagem de confirmação enviada com sucesso para o ID {id_dest} {nome_dest}")
                     
                     # Atualiza o status para 'enviado'
                     cursor.execute("UPDATE confirmados SET status = 'enviado' WHERE id = %s", (conf['id'],))
@@ -1345,8 +1352,10 @@ Bora continuar arrasando!💪🔥
             time.sleep(5)  # Espera 5 segundos antes de rodar novamente
         else:
             if datetime.now(pytz.timezone('America/Sao_Paulo')).hour >= 21:
+                print("Fora do horário permitido. Aguardando 12 horas para reiniciar...")
                 time.sleep(12 * 60 * 60)  # Aguarda 12 horas
             else:
+                print("Aguardando para iniciar às 08h...")
                 time.sleep(60 * 60)  # Aguarda 1 hora se ainda não for 08h
 
 
@@ -1368,7 +1377,7 @@ async def cortes_barbeiro(update: Update, context: CallbackContext):
         cursor = conn.cursor(dictionary=True)
 
         # Consulta para obter os barbeiros
-        cursor.execute("SELECT id_telegram, nome FROM barbeiros")
+        cursor.execute("SELECT id_telegram, nome FROM barbeiros WHERE status = 'ativo'")
         barbeiros = cursor.fetchall()
 
         # Verifica se há resultados
@@ -1585,7 +1594,7 @@ async def comissao_barbeiro(update: Update, context: CallbackContext):
         cursor = conn.cursor(dictionary=True)
 
         # Consulta para obter os barbeiros
-        cursor.execute("SELECT id_telegram, nome FROM barbeiros")
+        cursor.execute("SELECT id_telegram, nome FROM barbeiros WHERE status = 'ativo'")
         barbeiros = cursor.fetchall()
 
         # Verifica se há resultados
