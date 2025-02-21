@@ -5,7 +5,6 @@ import mysql.connector
 from datetime import datetime, date, timedelta
 import time 
 import pytz
-import schedule
 import re
 
 # Módulos padrão do Python
@@ -229,9 +228,7 @@ def cancelar():
 
         # Atualizar o status, celular e nome do cliente
         query = """
-            UPDATE horarios
-            SET status = 'disponível', celular_cliente = NULL, nome_cliente = NULL, corte_id = NULL
-            WHERE id = %s
+            DELETE FROM horarios WHERE id = %s
         """
         cursor.execute(query, (horario_id,))
         conn.commit()
@@ -271,9 +268,7 @@ def reagendar():
 
         # Atualizar o horário atual para "disponível"
         query = """
-            UPDATE horarios
-            SET status = 'disponível', celular_cliente = NULL, nome_cliente = NULL, corte_id = NULL
-            WHERE id = %s
+            DELETE FROM horarios WHERE id = %s
         """
         cursor.execute(query, (horario_id,))
         conn.commit()
@@ -380,36 +375,17 @@ def datas(celular_barbeiro):
     corte_id = request.args.get('corte_id')
 
     try:
-        conn = mysql.connector.connect(**config)
-        cursor = conn.cursor()
-
         # Obtendo a data atual em Brasília
         current_date = datetime.now(pytz.timezone('America/Sao_Paulo')).strftime('%Y-%m-%d')  # Formato: '2025-01-20'
 
-        # Query para buscar datas disponíveis
-        query = """
-        SELECT DISTINCT data 
-        FROM horarios 
-        WHERE celular_barbeiro = %s AND data >= %s 
-        ORDER BY data
-        """
-        cursor.execute(query, (celular_barbeiro, current_date))
-        datas = cursor.fetchall()
+        # Apenas retorna a data atual formatada
+        formatted_datas = [{
+            'original': current_date,
+            'formatted': datetime.strptime(current_date, '%Y-%m-%d').strftime('%d/%m/%Y')
+        }]
 
-        # Formatando as datas para o formato 'DD/MM/YYYY'
-        formatted_datas = [
-            {
-                'original': data[0].strftime('%Y-%m-%d'),  # Formato original para referência
-                'formatted': data[0].strftime('%d/%m/%Y')  # Formato 'DD/MM/YYYY'
-            }
-            for data in datas
-        ]
-
-        cursor.close()
-        conn.close()
-
-    except mysql.connector.Error as err:
-        flash(f"Erro ao buscar datas: {err}", "danger")
+    except Exception as err:
+        flash(f"Erro ao buscar data: {err}", "danger")
         formatted_datas = []
 
     return render_template('datas.html', datas=formatted_datas, celular_barbeiro=celular_barbeiro, corte_id=corte_id)
@@ -441,28 +417,38 @@ def horarios(celular_barbeiro, data):
         conn = mysql.connector.connect(**config)
         cursor = conn.cursor()
 
-        # Consulta SQL para obter todos os horários do dia, independente da data
+        # Consulta SQL para obter os horários indisponíveis
         query = """
             SELECT horario, status
             FROM horarios
             WHERE celular_barbeiro = %s 
               AND data = %s 
-            ORDER BY horario
+              AND horario BETWEEN '08:00:00' AND '20:00:00'
         """
         cursor.execute(query, (celular_barbeiro, data))
-
-        horarios_raw = cursor.fetchall()
+        horarios_indisponiveis_raw = cursor.fetchall()
         cursor.close()
         conn.close()
 
-        # Processar horários
-        horarios = [
-            (
-                f"{(horario.seconds // 3600):02}:{((horario.seconds // 60) % 60):02}",  # Converter timedelta para HH:MM
-                status
-            )
-            for horario, status in horarios_raw
-        ]
+        # Processar horários indisponíveis
+        horarios_indisponiveis = {
+            f"{(horario.seconds // 3600):02}:{((horario.seconds // 60) % 60):02}": status
+            for horario, status in horarios_indisponiveis_raw
+        }
+
+        # Gerar horários de 08:00 às 20:00 em intervalos de 30 minutos
+        horarios = []
+        horario_atual = datetime.strptime('08:00:00', '%H:%M:%S')
+        horario_final = datetime.strptime('20:00:00', '%H:%M:%S')
+
+        while horario_atual <= horario_final:
+            horario_str = horario_atual.strftime('%H:%M')
+            if horario_str in horarios_indisponiveis:
+                status = horarios_indisponiveis[horario_str]
+            else:
+                status = 'disponivel'
+            horarios.append((horario_str, status))
+            horario_atual += timedelta(minutes=30)
 
     except mysql.connector.Error as err:
         flash(f"Erro ao buscar horários: {err}", "danger")
@@ -486,7 +472,6 @@ def horarios(celular_barbeiro, data):
 # Reservar horário
 @app.route('/reservar', methods=['POST'])
 def reservar():
-    horario_id = request.form.get('horario_id')
     celular_barbeiro = request.form['celular_barbeiro']
     data = request.form['data']  # Recebida no formato DD/MM/YYYY
     horario = request.form['horario']
@@ -499,15 +484,6 @@ def reservar():
 
         conn = mysql.connector.connect(**config)
         cursor = conn.cursor()
-
-        # Obter o nome do barbeiro
-        cursor.execute("SELECT nome FROM barbeiros WHERE celular = %s", (celular_barbeiro,))
-        barbeiro = cursor.fetchone()
-        nome_barbeiro = barbeiro[0] if barbeiro else None
-
-        if not nome_barbeiro:
-            flash("Barbeiro não encontrado.", "danger")
-            return redirect(url_for('datas', celular_barbeiro=celular_barbeiro, celular_cliente=celular_cliente))
 
         # Obter o nome do cliente
         cursor.execute("SELECT nome FROM clientes WHERE celular = %s", (celular_cliente,))
@@ -528,27 +504,12 @@ def reservar():
 
         corte, valor = corte_info
 
-        # Verificar se o horário está disponível
+        # Inserir novo horário na tabela (removendo nome_barbeiro)
         query = """
-            SELECT id
-            FROM horarios
-            WHERE celular_barbeiro = %s AND data = %s AND horario = %s AND status = 'disponível'
+            INSERT INTO horarios (celular_barbeiro, data, horario, status, celular_cliente, nome_cliente, corte_id)
+            VALUES (%s, %s, %s, 'reservado', %s, %s, %s)
         """
-        cursor.execute(query, (celular_barbeiro, data_formatada, horario))
-        horario_info = cursor.fetchone()
-
-        if not horario_info:
-            flash("Horário desejado não está disponível.", "danger")
-            return redirect(url_for('datas', celular_barbeiro=celular_barbeiro, celular_cliente=celular_cliente))
-
-        # Atualizar o status do horário existente
-        horario_id = horario_info[0]
-        query = """
-            UPDATE horarios
-            SET celular_barbeiro = %s, data = %s, horario = %s, status = 'reservado', celular_cliente = %s, nome_cliente = %s, corte_id = %s
-            WHERE id = %s
-        """
-        cursor.execute(query, (celular_barbeiro, data_formatada, horario, celular_cliente, nome_cliente, corte_id, horario_id))
+        cursor.execute(query, (celular_barbeiro, data_formatada, horario, celular_cliente, nome_cliente, corte_id))
         conn.commit()
 
         cursor.close()
@@ -560,15 +521,14 @@ def reservar():
             'bemvindo', 
             celular_cliente=celular_cliente, 
             nome_cliente=nome_cliente, 
-            nome_barbeiro=nome_barbeiro, 
-            data=data,  # Pode continuar exibindo no formato DD/MM/YYYY para o usuário
+            data=data,  # Mantendo formato DD/MM/YYYY para exibição
             horario=horario, 
             corte=corte, 
             valor=valor
         ))
 
     except mysql.connector.Error as err:
-        flash(f"Erro ao reservar ou reagendar horário: {err}", "danger")
+        flash(f"Erro ao reservar horário: {err}", "danger")
         return redirect(url_for('datas', celular_barbeiro=celular_barbeiro, celular_cliente=celular_cliente))
 
 
@@ -841,7 +801,6 @@ def confirmar_corte(horario_id, pagamento):
             CASE 
                 WHEN h.corte_id = 24 THEN 20
                 WHEN h.corte_id = 25 THEN 30
-                WHEN h.corte_id = 22 THEN 10
                 ELSE (b.porcentagem / 100) * p.valor 
             END AS comissao,
             %s
@@ -896,61 +855,6 @@ def confirmar_corte(horario_id, pagamento):
 
 
 
-# Função para adicionar os horarios
-def adicionar_horarios():
-    try:
-        conn = mysql.connector.connect(**config)
-        cursor = conn.cursor()
-
-        # Obtém a data atual em Brasília
-        data_atual = datetime.now(pytz.timezone('America/Sao_Paulo')).strftime('%Y-%m-%d')
-
-        # Consulta para obter barbeiros ativos
-        cursor.execute("SELECT celular FROM barbeiros WHERE status = 'ativo'")
-        barbeiros = cursor.fetchall()
-
-        for barbeiro in barbeiros:
-            celular_barbeiro = barbeiro[0]
-
-            # Gera horários das 08:00 às 20:00 em intervalos de 30 minutos
-            horarios = [(celular_barbeiro, data_atual, (datetime(2000, 1, 1, 8, 0) + timedelta(minutes=30 * i)).time()) for i in range(25)]
-
-            # Insere os horários na tabela
-            cursor.executemany("""
-                INSERT INTO horarios (celular_barbeiro, data, horario, celular_cliente, nome_cliente)
-                VALUES (%s, %s, %s, NULL, NULL)
-                ON DUPLICATE KEY UPDATE celular_barbeiro = VALUES(celular_barbeiro)
-            """, horarios)
-
-        conn.commit()
-        cursor.close()
-        conn.close()
-        print("Horários adicionados com sucesso.")
-    except mysql.connector.Error as err:
-        print(f"Erro ao adicionar horários: {err}")
-
-
-def ajustar_horario_execucao():
-    # Define o fuso horário de Brasília
-    fuso_brasilia = pytz.timezone('America/Sao_Paulo')
-
-    # Obtém o fuso horário do servidor
-    fuso_servidor = datetime.now().astimezone().tzinfo
-
-    # Calcula a hora equivalente no servidor para meia-noite em Brasília
-    agora_em_brasilia = datetime.now(fuso_brasilia)
-    hora_execucao_servidor = agora_em_brasilia.replace(hour=0, minute=0, second=0).astimezone(fuso_servidor).strftime("%H:%M")
-
-    print(f"Agendando execução para {hora_execucao_servidor} no horário do servidor.")
-
-    # Agenda a função no horário correto
-    schedule.every().day.at(hora_execucao_servidor).do(adicionar_horarios)
-
-
-
-
-
-
 
 
 
@@ -981,13 +885,12 @@ logger = logging.getLogger(__name__)
 def log_usuario(update, button_name=None):
     user_id = update.effective_user.id  # Obtém o ID do usuário
     user_name = update.effective_user.full_name  # Obtém o nome completo do usuário
-    data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # Data/hora formatada
     comando = update.message.text if update.message else "Botão clicado"
     
     if button_name:
         comando = f"Botão {button_name} clicado"
 
-    print(f"Informação {comando} recebido em {data_hora} ID={user_id}, Usuário={user_name}")
+    print(f"Informação {comando} recebido ID={user_id}, Usuário={user_name}")
 
 
 
@@ -1063,7 +966,8 @@ async def start(update: Update, context: CallbackContext):
             [InlineKeyboardButton("Agendar Horário", url="web-production-9c5e2.up.railway.app")],
             [InlineKeyboardButton("Confirmar Corte", url="web-production-9c5e2.up.railway.app/selecionar_barbeiro")],
             [InlineKeyboardButton("Cadastrar Barbeiro", url="web-production-9c5e2.up.railway.app/consultar_barbeiro")],
-            [InlineKeyboardButton("Lista Barbeiros", callback_data="lista_barbeiro")],
+            [InlineKeyboardButton("Consultar Cliente", callback_data="consultar_cliente")],
+            [InlineKeyboardButton("Consultar Barbeiro", callback_data="lista_barbeiro")],
             [InlineKeyboardButton("Cortes por Barbeiro", callback_data="cortes_barbeiro")],
             [InlineKeyboardButton("Comissão por Barbeiro", callback_data="comissao_barbeiro")],
             [InlineKeyboardButton("Ajustar Comissão", callback_data="ajustar_comissao")],
@@ -1075,6 +979,7 @@ async def start(update: Update, context: CallbackContext):
         # Menu para usuários com acesso limitado
         keyboard = [
             [InlineKeyboardButton("Agendar Horário", url="web-production-9c5e2.up.railway.app")],
+            [InlineKeyboardButton("Consultar Cliente", callback_data="consultar_cliente")],
             [InlineKeyboardButton("Cortes por Barbeiro", callback_data="cortes_barbeiro")],
             [InlineKeyboardButton("Comissão por Barbeiro", callback_data="comissao_barbeiro")],
         ]
@@ -1096,9 +1001,6 @@ async def menu(update: Update, context: CallbackContext):
     user_id = str(update.effective_user.id)
     user_name = update.effective_user.full_name
 
-    # Loga a tentativa de acesso
-    log_usuario(update)  # Chama a função log_usuario, que já pega user_id e user_name corretamente
-
     # Verifica se o usuário está autorizado
     if user_id not in map(str, AUTHORIZED_USER_IDS) and user_id not in LIMITED_ACCESS_USER_IDS:
         # Loga a tentativa de acesso de usuário não autorizado
@@ -1117,7 +1019,8 @@ async def menu(update: Update, context: CallbackContext):
             [InlineKeyboardButton("Agendar Horário", url="web-production-9c5e2.up.railway.app")],
             [InlineKeyboardButton("Confirmar Corte", url="web-production-9c5e2.up.railway.app/selecionar_barbeiro")],
             [InlineKeyboardButton("Cadastrar Barbeiro", url="web-production-9c5e2.up.railway.app/consultar_barbeiro")],
-            [InlineKeyboardButton("Lista Barbeiros", callback_data="lista_barbeiro")],
+            [InlineKeyboardButton("Consultar Cliente", callback_data="consultar_cliente")],
+            [InlineKeyboardButton("Consultar Barbeiro", callback_data="lista_barbeiro")],
             [InlineKeyboardButton("Cortes por Barbeiro", callback_data="cortes_barbeiro")],
             [InlineKeyboardButton("Comissão por Barbeiro", callback_data="comissao_barbeiro")],
             [InlineKeyboardButton("Ajustar Comissão", callback_data="ajustar_comissao")],
@@ -1129,6 +1032,7 @@ async def menu(update: Update, context: CallbackContext):
         # Menu para usuários com acesso limitado
         keyboard = [
             [InlineKeyboardButton("Agendar Horário", url="web-production-9c5e2.up.railway.app")],
+            [InlineKeyboardButton("Consultar Cliente", callback_data="consultar_cliente")],
             [InlineKeyboardButton("Cortes por Barbeiro", callback_data="cortes_barbeiro")],
             [InlineKeyboardButton("Comissão por Barbeiro", callback_data="comissao_barbeiro")],
         ]
@@ -1160,10 +1064,150 @@ async def safe_edit_message(query, new_text, reply_markup=None):
 
 
 
+
+
+# Função para consultar cliente por celular ou nome
+async def consultar_cliente(update: Update, context: CallbackContext):
+    if "aguardando_input" in context.user_data and context.user_data["aguardando_input"] == "consultar_cliente":
+        pesquisa = update.message.text.strip()
+        
+        log_usuario(update)  # Log do input do usuário
+
+        try:
+            conn = mysql.connector.connect(**config)
+            cursor = conn.cursor()
+
+            # Verifica se o input é um número (celular) ou texto (nome)
+            if pesquisa.isdigit():  # Pesquisa por celular
+                query_sql = """
+                SELECT 
+                    cl.celular,
+                    cl.nome as nome_cliente,
+                    c.data AS ultima_data_corte,
+                    b.nome AS nome_barbeiro,
+                    c.corte
+                FROM clientes cl
+                LEFT JOIN confirmados c 
+                    ON c.celular_cliente = cl.celular 
+                    AND c.data = (
+                        SELECT MAX(c2.data) 
+                        FROM confirmados c2 
+                        WHERE c2.celular_cliente = cl.celular
+                    )
+                    AND c.horario = (
+                        SELECT MAX(c3.horario) 
+                        FROM confirmados c3 
+                        WHERE c3.celular_cliente = cl.celular
+                        AND c3.data = c.data
+                    )
+                LEFT JOIN barbeiros b 
+                    ON b.celular = c.celular_barbeiro
+                WHERE cl.celular = %s;
+                """
+                cursor.execute(query_sql, (pesquisa,))
+            else:  # Pesquisa por nome
+                query_sql = """
+                SELECT 
+                    cl.celular,
+                    cl.nome as nome_cliente,
+                    c.data AS ultima_data_corte,
+                    b.nome AS nome_barbeiro,
+                    c.corte
+                FROM clientes cl
+                LEFT JOIN confirmados c 
+                    ON c.celular_cliente = cl.celular 
+                    AND c.data = (
+                        SELECT MAX(c2.data) 
+                        FROM confirmados c2 
+                        WHERE c2.celular_cliente = cl.celular
+                    )
+                    AND c.horario = (
+                        SELECT MAX(c3.horario) 
+                        FROM confirmados c3 
+                        WHERE c3.celular_cliente = cl.celular
+                        AND c3.data = c.data
+                    )
+                LEFT JOIN barbeiros b 
+                    ON b.celular = c.celular_barbeiro
+                WHERE cl.nome LIKE %s;
+                """
+                cursor.execute(query_sql, (f"%{pesquisa}%",))
+
+            clientes = cursor.fetchall()
+
+            # Verifica se há resultados
+            if not clientes:
+                # Cria botões "Consultar Novamente" e "Menu"
+                keyboard = [
+                    [InlineKeyboardButton("Consultar Novamente", callback_data="consultar_cliente")],
+                    [InlineKeyboardButton("Menu", callback_data="menu")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+
+                await update.message.reply_text("Nenhum cliente encontrado.", reply_markup=reply_markup)
+                return
+
+            # Formata a mensagem para o usuário
+            resposta = "Dados encontrados do cliente: \n\n"
+            for celular, nome_cliente, ultima_data_corte, nome_barbeiro, corte in clientes:
+                # Formata a data (se não for None)
+                if ultima_data_corte:
+                    ultima_data_corte = datetime.strptime(str(ultima_data_corte), "%Y-%m-%d").strftime("%d/%m/%Y")
+                else:
+                    ultima_data_corte = "Nenhum dado"
+
+                # Substitui None por "Nenhum dado"
+                nome_barbeiro = nome_barbeiro if nome_barbeiro else "Nenhum dado"
+                corte = corte if corte else "Nenhum dado"
+
+                resposta += (
+                    f"*Celular:* {celular}\n"
+                    f"*Nome:* {nome_cliente}\n"
+                    f"*Dados do último corte*\n"
+                    f"*Data:* {ultima_data_corte}\n"
+                    f"*Corte:* {corte}\n"
+                    f"*Barbeiro:* {nome_barbeiro}\n\n"
+                )
+
+            # Define os botões "Menu" e "Consultar Novamente"
+            keyboard = [
+                [InlineKeyboardButton("Consultar Novamente", callback_data="consultar_cliente")],
+                [InlineKeyboardButton("Menu", callback_data="menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            # Envia a mensagem para o usuário com os botões
+            await update.message.reply_text(
+                resposta,
+                reply_markup=reply_markup,
+                parse_mode="Markdown"
+            )
+
+            # Remove o estado de aguardando input
+            context.user_data.pop("aguardando_input", None)
+
+        except mysql.connector.Error as err:
+            await update.message.reply_text(f"Erro ao acessar o banco de dados: {err}")
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+
+
+
+
+
+
+
+
+
+
 # Função para exibir a lista de barbeiros
 async def lista_barbeiro(update: Update, context: CallbackContext):
     query = update.callback_query
-    button_name = "Lista Barbeiro"  # Nome do botão
+    button_name = "Consultar Barbeiro"  # Nome do botão
     log_usuario(update, button_name)  # Log para registrar quem clicou no botão
 
     try:
@@ -1225,13 +1269,6 @@ async def lista_barbeiro(update: Update, context: CallbackContext):
 
 
 
-def verificar_horario():
-    """Verifica se o horário está dentro do permitido (08h às 21h) todos os dias da semana."""
-    agora = datetime.now(pytz.timezone('America/Sao_Paulo'))
-    hora_atual = agora.hour
-
-    return 8 <= hora_atual < 21  # Permite entre 08h e 21h
-
 
 
 def enviar_mensagem(telegram_id, mensagem):
@@ -1245,73 +1282,66 @@ def enviar_mensagem(telegram_id, mensagem):
     return response.status_code == 200
 
 def enviar_mensagem_barbeiro():
-    """Monitora a tabela mensagem e envia notificações para mensagens pendentes, dentro do horário permitido."""
+    """Monitora a tabela mensagem e envia notificações para mensagens pendentes."""
     while True:
-        if verificar_horario():
-            try:
-                conn = mysql.connector.connect(**config)
-                cursor = conn.cursor(dictionary=True)
+        try:
+            conn = mysql.connector.connect(**config)
+            cursor = conn.cursor(dictionary=True)
+            
+            cursor.execute("SELECT id, data, horario, nome_barbeiro, nome_cliente, corte, id_telegram FROM mensagem WHERE status = 'pendente'")
+            mensagens = cursor.fetchall()
+            
+            for msg in mensagens:
+                data_formatada = datetime.strptime(str(msg['data']), "%Y-%m-%d").strftime("%d/%m/%Y")
+                horario_formatado = datetime.strptime(str(msg['horario']), "%H:%M:%S").strftime("%H:%M")
                 
-                cursor.execute("SELECT id, data, horario, nome_barbeiro, nome_cliente, corte, id_telegram FROM mensagem WHERE status = 'pendente'")
-                mensagens = cursor.fetchall()
-                
-                for msg in mensagens:
-                    data_formatada = datetime.strptime(str(msg['data']), "%Y-%m-%d").strftime("%d/%m/%Y")
-                    horario_formatado = datetime.strptime(str(msg['horario']), "%H:%M:%S").strftime("%H:%M")
-                    
-                    mensagem_texto = f"""
-*✂️ Novo horário agendado! ✂️*\n
-E aí, {msg['nome_barbeiro']}, tem serviço marcado! 🎉\n
+                mensagem_texto = f"""
+*✂️ Novo horário agendado! ✂️*
+
+E aí, {msg['nome_barbeiro']}, tem serviço marcado! 🎉
 📅 *Data:* {data_formatada}
 ⏰ *Horário:* {horario_formatado}
 👤 *Cliente:* {msg['nome_cliente']}
-✂️ *Corte:* {msg['corte']}\n
+✂️ *Corte:* {msg['corte']}
+
 Deixa tudo na régua, hein? 📏✂️
-                    """
-                    
-                    if enviar_mensagem(msg['id_telegram'], mensagem_texto):
-                        print(f"Mensagem de agendamento enviada com sucesso para o ID {msg['id_telegram']} {msg['nome_barbeiro']}")
-                        cursor.execute("UPDATE mensagem SET status = 'enviado' WHERE id = %s", (msg['id'],))
-                        conn.commit()
+                """
                 
-                cursor.close()
-                conn.close()
+                if enviar_mensagem(msg['id_telegram'], mensagem_texto):
+                    print(f"Mensagem de agendamento enviada com sucesso para o ID {msg['id_telegram']} {msg['nome_barbeiro']}")
+                    cursor.execute("UPDATE mensagem SET status = 'enviado' WHERE id = %s", (msg['id'],))
+                    conn.commit()
             
-            except Exception as e:
-                print(f"Erro: {e}")
-            
-            time.sleep(5)  # Espera 5 segundos antes de rodar novamente
-        else:
-            if datetime.now(pytz.timezone('America/Sao_Paulo')).hour >= 21:
-                print("Fora do horário permitido. Aguardando 12 horas para reiniciar...")
-                time.sleep(12 * 60 * 60)  # Aguarda 12 horas (caso seja após as 20h)
-            else:
-                print("Aguardando para iniciar às 08h...")
-                time.sleep(60 * 60)  # Aguarda 1 hora se ainda não for 08h
+            cursor.close()
+            conn.close()
+        
+        except Exception as e:
+            print(f"Erro: {e}")
+        
+        time.sleep(5)  # Espera 5 segundos antes de rodar novamente
 
 def enviar_mensagem_confirmados():
-    """Verifica a tabela confirmados e envia notificações para mensagens pendentes, dentro do horário permitido."""
+    """Verifica a tabela confirmados e envia notificações para mensagens pendentes."""
     while True:
-        if verificar_horario():
-            try:
-                conn = mysql.connector.connect(**config)
-                cursor = conn.cursor(dictionary=True)
+        try:
+            conn = mysql.connector.connect(**config)
+            cursor = conn.cursor(dictionary=True)
+            
+            cursor.execute("""
+                SELECT c.id, c.data, c.horario, b.nome AS nome_barbeiro, cl.nome AS nome_cliente, 
+                       c.pagamento, c.corte, c.valor, c.comissao, b.id_telegram   
+                FROM confirmados c
+                INNER JOIN barbeiros b ON b.celular = c.celular_barbeiro 
+                INNER JOIN clientes cl ON cl.celular = c.celular_cliente 
+                WHERE c.status = 'pendente'
+            """)
+            confirmados = cursor.fetchall()
+            
+            for conf in confirmados:
+                data_formatada = datetime.strptime(str(conf['data']), "%Y-%m-%d").strftime("%d/%m/%Y")
+                horario_formatado = datetime.strptime(str(conf['horario']), "%H:%M:%S").strftime("%H:%M")
                 
-                cursor.execute("""
-                    SELECT c.id, c.data, c.horario, b.nome AS nome_barbeiro, cl.nome AS nome_cliente, 
-                           c.pagamento, c.corte, c.valor, c.comissao, b.id_telegram   
-                    FROM confirmados c
-                    INNER JOIN barbeiros b ON b.celular = c.celular_barbeiro 
-                    INNER JOIN clientes cl ON cl.celular = c.celular_cliente 
-                    WHERE c.status = 'pendente'
-                """)
-                confirmados = cursor.fetchall()
-                
-                for conf in confirmados:
-                    data_formatada = datetime.strptime(str(conf['data']), "%Y-%m-%d").strftime("%d/%m/%Y")
-                    horario_formatado = datetime.strptime(str(conf['horario']), "%H:%M:%S").strftime("%H:%M")
-                    
-                    mensagem_texto = f"""
+                mensagem_texto = f"""
 *✂️ Corte Realizado! ✂️*
 
 E aí, {conf['nome_barbeiro']} mandou bem demais! 🎉
@@ -1325,38 +1355,29 @@ E aí, {conf['nome_barbeiro']} mandou bem demais! 🎉
 
 O cliente saiu satisfeito e o caixa agradece!💸
 Bora continuar arrasando!💪🔥
-                    """
-                    
-                    # Envia a mensagem para o ID fixo (Márcio Garcia) e para o barbeiro
-                    ids_destinatarios = [
-                        (637172689, "Márcio Garcia"),
-                        (6416269997, "Lucas Lima")                    
-                    ]
-                    if conf['id_telegram']:
-                        ids_destinatarios.append((conf['id_telegram'], conf['nome_barbeiro']))
-                    
-                    for id_dest, nome_dest in ids_destinatarios:
-                        if enviar_mensagem(id_dest, mensagem_texto):
-                            print(f"Mensagem de confirmação enviada com sucesso para o ID {id_dest} {nome_dest}")
-                    
-                    # Atualiza o status para 'enviado'
-                    cursor.execute("UPDATE confirmados SET status = 'enviado' WHERE id = %s", (conf['id'],))
-                    conn.commit()
+                """
                 
-                cursor.close()
-                conn.close()
+                ids_destinatarios = [
+                    (637172689, "Márcio Garcia"),
+                    (6416269997, "Lucas Lima")                    
+                ]
+                if conf['id_telegram']:
+                    ids_destinatarios.append((conf['id_telegram'], conf['nome_barbeiro']))
+                
+                for id_dest, nome_dest in ids_destinatarios:
+                    if enviar_mensagem(id_dest, mensagem_texto):
+                        print(f"Mensagem de confirmação enviada com sucesso para o ID {id_dest} {nome_dest}")
+                
+                cursor.execute("UPDATE confirmados SET status = 'enviado' WHERE id = %s", (conf['id'],))
+                conn.commit()
             
-            except Exception as e:
-                print(f"Erro: {e}")
-            
-            time.sleep(5)  # Espera 5 segundos antes de rodar novamente
-        else:
-            if datetime.now(pytz.timezone('America/Sao_Paulo')).hour >= 21:
-                print("Fora do horário permitido. Aguardando 12 horas para reiniciar...")
-                time.sleep(12 * 60 * 60)  # Aguarda 12 horas
-            else:
-                print("Aguardando para iniciar às 08h...")
-                time.sleep(60 * 60)  # Aguarda 1 hora se ainda não for 08h
+            cursor.close()
+            conn.close()
+        
+        except Exception as e:
+            print(f"Erro: {e}")
+        
+        time.sleep(5)  # Espera 5 segundos antes de rodar novamente
 
 
 
@@ -2181,6 +2202,8 @@ async def adicionar_acrescimo(update: Update, context: CallbackContext):
     context.user_data["celular_barbeiro"] = celular_barbeiro
     context.user_data["aguardando_input"] = "DESCRICAO_ACRESCIMO"  # Define o estado correto
 
+    log_usuario(update, button_name="Adicionar Acréscimo")  # Log do clique no botão
+
     await query.message.reply_text("Qual descrição do acréscimo?")
     return
 
@@ -2189,6 +2212,8 @@ async def receber_descricao_acrescimo(update: Update, context: CallbackContext):
     if re.search(r'\d', descricao):
         await update.message.reply_text("A descrição não pode conter números. Digite novamente:")
         return  # Apenas retorna, sem mudar o estado
+    
+    log_usuario(update)  # Log da entrada do usuário
     
     context.user_data["descricao"] = descricao
     context.user_data["aguardando_input"] = "VALOR_ACRESCIMO"  # Atualiza o estado corretamente
@@ -2240,6 +2265,8 @@ async def adicionar_desconto(update: Update, context: CallbackContext):
     context.user_data["celular_barbeiro"] = celular_barbeiro
     context.user_data["aguardando_input"] = "DESCRICAO_DESCONTO"  # Define o estado correto
 
+    log_usuario(update, button_name="Adicionar Desconto")  # Log do clique no botão
+
     await query.message.reply_text("Qual descrição do desconto?")
     return
 
@@ -2248,6 +2275,8 @@ async def receber_descricao_desconto(update: Update, context: CallbackContext):
     if re.search(r'\d', descricao):
         await update.message.reply_text("A descrição não pode conter números. Digite novamente:")
         return
+    
+    log_usuario(update)  # Log da entrada do usuário
     
     context.user_data["descricao"] = descricao
     context.user_data["aguardando_input"] = "VALOR_DESCONTO"  # Define corretamente o próximo estado
@@ -2314,16 +2343,23 @@ async def button_handler(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
 
-    if query.data == "lista_barbeiro":
+    if query.data == "consultar_cliente":
+        log_usuario(update, button_name="Consultar Cliente")  # Log do clique no botão
+        context.user_data["aguardando_input"] = "consultar_cliente"
+        await query.edit_message_text("Digite o celular ou nome do cliente para consulta")
+
+    elif query.data == "lista_barbeiro":
         # Chama a função de listar barbeiros
         await lista_barbeiro(update, context)
+
     elif query.data == "menu":
         # Retorna ao menu principal
+        log_usuario(update, button_name="Menu")  # Log do clique no botão
         await menu(update, context)
+
     elif query.data == "cortes_barbeiro":
         # Chama a função de listar barbeiros para cortes
-        await cortes_barbeiro(update, context)
-
+        await cortes_barbeiro(update, context)  
 
     elif query.data.startswith("barbeirocortes_"):
         # Chama a função de selecionar ano
@@ -2365,14 +2401,13 @@ async def button_handler(update: Update, context: CallbackContext):
 
 
 
+    elif query.data.startswith("barbeiro_"):
+        # Chama a função para exibir detalhes do barbeiro selecionado
+        await detalhes_barbeiro(update, context)
 
     elif query.data.startswith("ajustar_comissao"):
         # Chama a função para exibir os barbeiros
         await ajustar_comissao(update, context)
-
-    elif query.data.startswith("barbeiro_"):
-        # Chama a função para exibir detalhes do barbeiro selecionado
-        await detalhes_barbeiro(update, context)
 
     elif query.data.startswith("adicionar_acrescimo_"):
         # Chama a função para adicionar acréscimo
@@ -2398,12 +2433,8 @@ async def button_handler(update: Update, context: CallbackContext):
 
 # Função para redirecionar o usuário com base no contexto ou comando
 async def entrada_usuario(update: Update, context: CallbackContext):
-    # Verifica se há um contexto específico em andamento
-    if context.user_data.get("aguardando_input") == "lista_barbeiro":
-        await lista_barbeiro(update, context)
-        return
 
-    elif context.user_data.get("aguardando_input") == "DESCRICAO_ACRESCIMO":
+    if context.user_data.get("aguardando_input") == "DESCRICAO_ACRESCIMO":
         await receber_descricao_acrescimo(update, context)
         return
 
@@ -2419,10 +2450,14 @@ async def entrada_usuario(update: Update, context: CallbackContext):
         await receber_valor_desconto(update, context)
         return
 
+    elif context.user_data.get("aguardando_input") == "consultar_cliente":
+        await consultar_cliente(update, context)
+        return
+
     # Se a mensagem não for um comando reconhecido, redireciona para o menu
     if update.message.text not in ['/start', '/menu']:
+        log_usuario(update)  # Registra a mensagem do usuário antes de redirecionar
         await menu(update, context)
-
 
 
 
@@ -2444,14 +2479,6 @@ def run_bot():
     # Inicia o bot
     application.run_polling()
 
-# Função para rodar o cron job
-def run_cron_job():
-    ajustar_horario_execucao()
-
-    while True:
-        schedule.run_pending()
-        time.sleep(1)
-
 # Função principal para rodar o Flask
 def main():
     # Rodar o Flask em uma thread separada sem SSL
@@ -2470,9 +2497,6 @@ def main():
 
     # Rodar o monitoramento de confirmados em uma thread separada
     threading.Thread(target=enviar_mensagem_confirmados).start()
-
-    # Rodar o cron job em uma thread separada
-    threading.Thread(target=run_cron_job).start()
 
     # Rodar o bot no processo principal
     run_bot()
