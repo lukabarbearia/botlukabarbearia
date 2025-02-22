@@ -303,9 +303,12 @@ def cortes():
         conn = mysql.connector.connect(**config)
         cursor = conn.cursor()
 
+        # Busca os dias da semana onde a promoção está ativa (status = 'sim')
+        cursor.execute("SELECT id FROM semana WHERE status = 'sim'")
+        dias_promocao = [row[0] for row in cursor.fetchall()]  # Lista de IDs dos dias ativos
+
         # Consulta para obter todos os cortes e seus IDs
-        query = "SELECT id, corte, valor FROM precos"
-        cursor.execute(query)
+        cursor.execute("SELECT id, corte, valor FROM precos")
         cortes = cursor.fetchall()
 
         cursor.close()
@@ -313,16 +316,17 @@ def cortes():
     except mysql.connector.Error as err:
         flash(f"Erro ao buscar cortes: {err}", "danger")
         cortes = []
+        dias_promocao = []  # Se houver erro, evita crash
 
-    # Organiza os cortes em grupos de acordo com o dia da semana
-    if dia_semana in [1, 2]:  # Terça (1) e Quarta (2)
+    # Organiza os cortes em grupos de acordo com os dias de promoção
+    if dia_semana in dias_promocao:
         grupos = {
             "Combos Promoção": [corte for corte in cortes if corte[0] in [7, 8, 9, 10, 11, 12, 29, 30, 31]],
             "Cortes Promoção": [corte for corte in cortes if corte[0] in [14, 16, 18, 28]],
             "Barba & Sobrancelha": [corte for corte in cortes if corte[0] in [19, 20, 21]],
             "Pinturas & Finalizações": [corte for corte in cortes if corte[0] in [22, 23, 24, 25, 26, 27]]
         }
-    else:  # Outros dias
+    else:  # Outros dias sem promoção
         grupos = {
             "Combos": [corte for corte in cortes if corte[0] in [1, 2, 3, 4, 5, 6, 29, 30, 31]],
             "Cortes Individuais": [corte for corte in cortes if corte[0] in [13, 15, 17, 28]],
@@ -971,6 +975,7 @@ async def start(update: Update, context: CallbackContext):
             [InlineKeyboardButton("Cortes por Barbeiro", callback_data="cortes_barbeiro")],
             [InlineKeyboardButton("Comissão por Barbeiro", callback_data="comissao_barbeiro")],
             [InlineKeyboardButton("Ajustar Comissão", callback_data="ajustar_comissao")],
+            [InlineKeyboardButton("Ajustar Promoção", callback_data="ajustar_promocao")],
             [InlineKeyboardButton("Faturamento Mês", callback_data="faturamentomes")],
         ]
         welcome_message = f"Olá, {user_name}! 👋\nBem-vindo ao *Bot Luka Barbearia*! 💪\n\nAqui estão as opções disponíveis no menu:"
@@ -1024,6 +1029,7 @@ async def menu(update: Update, context: CallbackContext):
             [InlineKeyboardButton("Cortes por Barbeiro", callback_data="cortes_barbeiro")],
             [InlineKeyboardButton("Comissão por Barbeiro", callback_data="comissao_barbeiro")],
             [InlineKeyboardButton("Ajustar Comissão", callback_data="ajustar_comissao")],
+            [InlineKeyboardButton("Ajustar Promoção", callback_data="ajustar_promocao")],
             [InlineKeyboardButton("Faturamento Mês", callback_data="faturamentomes")],
         ]
         message_text = "Escolha uma opção:"
@@ -1533,7 +1539,7 @@ async def exibir_cortes(update: Update, context: CallbackContext):
 
         # Consulta para obter os cortes confirmados
         cursor.execute("""
-            SELECT c.data, c.horario, b.nome AS nome_barbeiro, cl.nome AS nome_cliente, c.corte, c.pagamento,c.valor, c.comissao 
+            SELECT c.data, c.horario, b.nome AS nome_barbeiro, cl.nome AS nome_cliente, c.corte, c.pagamento, c.valor, c.comissao 
             FROM confirmados c
             INNER JOIN barbeiros b ON b.celular = c.celular_barbeiro 
             INNER JOIN clientes cl ON cl.celular = c.celular_cliente 
@@ -1558,7 +1564,9 @@ async def exibir_cortes(update: Update, context: CallbackContext):
         for corte in cortes:
             data_formatada = datetime.strptime(str(corte['data']), "%Y-%m-%d").strftime("%d/%m/%Y")
             horario_formatado = datetime.strptime(str(corte['horario']), "%H:%M:%S").strftime("%H:%M")
-            mensagens.append(f"*Data:* {data_formatada}\n*Horário:* {horario_formatado}\n*Cliente:* {corte['nome_cliente']}\n*Corte:* {corte['corte']}\n*Pagamento:* {corte['pagamento']}\n*valor:* R$ {corte['valor']}\n*Comissão:* R$ {corte['comissao']}\n\n")
+            mensagens.append(f"*Data:* {data_formatada}\n*Horário:* {horario_formatado}\n*Cliente:* {corte['nome_cliente']}\n*Corte:* {corte['corte']}\n*Pagamento:* {corte['pagamento']}\n*Valor:* R$ {corte['valor']}\n*Comissão:* R$ {corte['comissao']}\n\n")
+
+        total_cortes = len(mensagens)  # Conta o total de cortes
 
         # Dividir a mensagem em blocos de 20 cortes
         blocos = [mensagens[i:i + 20] for i in range(0, len(mensagens), 20)]
@@ -1567,8 +1575,9 @@ async def exibir_cortes(update: Update, context: CallbackContext):
         for i, bloco in enumerate(blocos):
             resposta_completa = resposta + ''.join(bloco)
             
-            # No último bloco, adicionar os botões
+            # No último bloco, adicionar o total de cortes e os botões
             if i == len(blocos) - 1:
+                resposta_completa += f"*Total de cortes realizados no mês:* {total_cortes}\n"
                 keyboard = [
                     [InlineKeyboardButton("Consultar Novamente", callback_data="cortes_barbeiro")],
                     [InlineKeyboardButton("Menu", callback_data="menu")],
@@ -2322,9 +2331,70 @@ async def receber_valor_desconto(update: Update, context: CallbackContext):
 
 
 
+# Função para exibir os dias da semana ao usuário
+async def ajustar_promocao(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    button_name = "Ajustar Promoção"
+    log_usuario(update, button_name)
+    
+    conn = mysql.connector.connect(**config)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, dia, status FROM semana")
+    dias = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    
+    if not dias:
+        keyboard = [[InlineKeyboardButton("Tentar Novamente", callback_data="ajustar_promocao")],
+                    [InlineKeyboardButton("Menu", callback_data="menu")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.message.reply_text("Nenhum dado encontrado.", reply_markup=reply_markup)
+        return
+    
+    resposta = "Escolha os dias para promoção:\n\n"
+    keyboard = []
+    for id_dia, dia, status in dias:
+        status_icone = "(✅)" if status == "sim" else "(❌)"
+        keyboard.append([InlineKeyboardButton(f"{dia} {status_icone}", callback_data=f"update_{id_dia}")])
+    
+    keyboard.append([InlineKeyboardButton("Menu", callback_data="menu")])
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.message.reply_text(resposta, reply_markup=reply_markup, parse_mode="Markdown")
 
-
-
+# Função para alternar o status do dia selecionado
+async def update_dia(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    await query.answer()
+    dia_id = query.data.split('_')[1]
+    
+    conn = mysql.connector.connect(**config)
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT status FROM semana WHERE id = %s", (dia_id,))
+    status_atual = cursor.fetchone()[0]
+    
+    novo_status = 'nao' if status_atual == 'sim' else 'sim'
+    cursor.execute("UPDATE semana SET status = %s WHERE id = %s", (novo_status, dia_id))
+    conn.commit()
+    
+    cursor.execute("SELECT id, dia, status FROM semana")
+    dias = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    
+    resposta = "Dia da promoção alterado com sucesso!\n\n"
+    for id_dia, dia, status in dias:
+        status_icone = "(✅)" if status == "sim" else "(❌)"
+        resposta += f"{dia}: {status_icone}\n"
+    
+    keyboard = [
+        [InlineKeyboardButton("Alterar Novamente", callback_data="ajustar_promocao")],
+        [InlineKeyboardButton("Menu", callback_data="menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.message.reply_text(resposta, reply_markup=reply_markup, parse_mode="Markdown")
 
 
 
@@ -2417,7 +2487,12 @@ async def button_handler(update: Update, context: CallbackContext):
         # Chama a função para adicionar desconto
         await adicionar_desconto(update, context)
 
+    elif query.data.startswith("update_"):
+        await update_dia(update, context)
 
+    elif query.data == "ajustar_promocao":
+        # Chama a função de listar barbeiros
+        await ajustar_promocao(update, context)
 
 
 
